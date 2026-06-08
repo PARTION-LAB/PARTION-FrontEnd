@@ -1,4 +1,6 @@
 <script setup>
+import { ref } from 'vue'
+
 defineProps({
   activeView: {
     type: String,
@@ -7,16 +9,34 @@ defineProps({
 })
 
 const emit = defineEmits(['navigate'])
+const isMenuOpen = ref(false)
 
 function go(view) {
   emit('navigate', view)
+  isMenuOpen.value = false
 }
 </script>
 
 <template>
   <header class="topbar">
     <button class="brand" type="button" @click="go('products')">Partion</button>
-    <nav aria-label="주요 메뉴">
+    <button
+      class="menu-toggle"
+      type="button"
+      aria-controls="primary-navigation"
+      :aria-expanded="isMenuOpen"
+      aria-label="메뉴 열기"
+      @click="isMenuOpen = !isMenuOpen"
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <nav
+      id="primary-navigation"
+      aria-label="주요 메뉴"
+      :class="{ open: isMenuOpen }"
+    >
       <button
         type="button"
         :class="{ active: activeView === 'products' }"
