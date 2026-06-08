@@ -65,7 +65,13 @@ function go(view) {
       >
         게시판
       </button>
-      <button type="button">원장</button>
+      <button
+        type="button"
+        :class="{ active: activeView === 'ledger' }"
+        @click="go('ledger')"
+      >
+        원장
+      </button>
     </nav>
     <button class="nav-login-button" type="button" @click="go('auth')">
       <span>로그인</span>
