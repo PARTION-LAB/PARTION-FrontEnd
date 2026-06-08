@@ -34,7 +34,9 @@ function countByCategory(category) {
           모집 중인 부동산·미술품 상품은 투자하고, 개별 곡 저작권 상품은
           바로 거래하기에서 매수·매도할 수 있습니다.
         </p>
-        <button type="button" class="primary-link">모집 중 상품 투자하기</button>
+        <button type="button" class="primary-link" @click="emit('navigate', 'invest')">
+          모집 중 상품 투자하기
+        </button>
       </div>
     </section>
 
@@ -71,6 +73,7 @@ function countByCategory(category) {
           v-for="product in visibleProducts"
           :key="product.symbol"
           :product="product"
+          @invest="emit('navigate', 'invest')"
         />
       </div>
     </section>
