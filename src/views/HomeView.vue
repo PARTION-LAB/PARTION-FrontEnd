@@ -74,6 +74,7 @@ function countByCategory(category) {
           :key="product.symbol"
           :product="product"
           @invest="emit('navigate', 'invest')"
+          @trade="emit('navigate', 'market')"
         />
       </div>
     </section>
