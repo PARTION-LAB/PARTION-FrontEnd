@@ -575,6 +575,12 @@ button {
   padding: 78px 0 96px;
 }
 
+.ledger-page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 78px 0 96px;
+}
+
 .page-hero {
   max-width: 760px;
 }
@@ -637,7 +643,9 @@ button {
 .trade-history > div,
 .board-compose,
 .board-feed,
-.board-post {
+.board-post,
+.chain-metric,
+.chain-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -1255,6 +1263,193 @@ button {
   color: var(--blue);
 }
 
+.blockchain-dashboard {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.blockchain-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.chain-metric {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.chain-metric span,
+.chain-metric small {
+  color: var(--subtle);
+  font-size: 14px;
+}
+
+.chain-metric strong {
+  color: var(--blue);
+  font-size: 28px;
+  line-height: 1.18;
+}
+
+.chain-metric strong.is-valid {
+  color: #0b7a55;
+}
+
+.ledger-state {
+  border: 1px solid #dbe4ff;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #f8f9ff;
+  color: #364fc7;
+  font-weight: 800;
+}
+
+.chain-panel {
+  padding: 24px;
+}
+
+.ledger-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid #dbe4ff;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #edf2ff;
+  color: #364fc7;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ledger-flow {
+  overflow: hidden;
+}
+
+.chain-node-map {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.chain-node {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #dbe4ff;
+  border-radius: 8px;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff, #f8f9ff);
+}
+
+.chain-node::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -13px;
+  width: 13px;
+  height: 2px;
+  background: #91a7ff;
+}
+
+.chain-node:last-child::after {
+  display: none;
+}
+
+.chain-node span {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.chain-node strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chain-node dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.chain-node dl div {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.chain-node dt,
+.chain-node dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chain-node dt {
+  color: #8b95a1;
+  font-weight: 800;
+}
+
+.chain-node dd {
+  color: #333d4b;
+}
+
+.ledger-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 16px;
+}
+
+.ledger-side,
+.chain-list {
+  display: grid;
+  gap: 10px;
+}
+
+.chain-row {
+  display: grid;
+  gap: 6px;
+  min-height: 76px;
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface-soft);
+}
+
+.chain-row.compact {
+  min-height: 60px;
+}
+
+.event-row {
+  border-left: 4px solid var(--green);
+}
+
+.chain-row span {
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.chain-row strong {
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chain-row small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .register-panel h2,
 .registered-panel h2 {
   margin: 0;
@@ -1431,8 +1626,13 @@ button {
   .market-layout,
   .market-grid,
   .trade-history,
-  .board-layout {
+  .board-layout,
+  .ledger-layout {
     grid-template-columns: 1fr;
+  }
+
+  .chain-node-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .payment-panel {
@@ -1530,7 +1730,8 @@ button {
   .register-page,
   .invest-page,
   .market-page,
-  .board-page {
+  .board-page,
+  .ledger-page {
     width: min(100% - 32px, 1120px);
   }
 
@@ -1544,7 +1745,9 @@ button {
   .asset-options,
   .form-grid,
   .plans,
-  .account-grid {
+  .account-grid,
+  .blockchain-summary,
+  .chain-node-map {
     grid-template-columns: 1fr;
   }
 
