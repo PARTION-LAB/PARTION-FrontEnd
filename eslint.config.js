@@ -14,6 +14,7 @@ export default [
       sourceType: 'module',
       globals: {
         document: 'readonly',
+        window: 'readonly',
       },
     },
   },
