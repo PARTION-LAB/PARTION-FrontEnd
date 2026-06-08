@@ -44,7 +44,13 @@ function go(view) {
       >
         상품
       </button>
-      <button type="button">투자</button>
+      <button
+        type="button"
+        :class="{ active: activeView === 'invest' }"
+        @click="go('invest')"
+      >
+        투자
+      </button>
       <button type="button">거래</button>
       <button type="button">게시판</button>
       <button type="button">원장</button>

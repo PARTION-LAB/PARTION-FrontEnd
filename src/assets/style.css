@@ -557,8 +557,30 @@ button {
   padding: 78px 0 96px;
 }
 
+.invest-page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 78px 0 96px;
+}
+
 .page-hero {
   max-width: 760px;
+}
+
+.invest-hero {
+  display: flex;
+  max-width: none;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.invest-hero .secondary-link {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .page-hero h1 {
@@ -581,8 +603,19 @@ button {
   margin-top: 28px;
 }
 
+.invest-layout {
+  display: grid;
+  grid-template-columns: 332px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 28px;
+}
+
 .register-panel,
-.registered-panel {
+.registered-panel,
+.product-picker,
+.invest-checkout,
+.payment-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -591,6 +624,180 @@ button {
 
 .register-panel {
   padding: 24px;
+}
+
+.product-picker,
+.selection,
+.payment-panel {
+  padding: 24px;
+}
+
+.panel-heading h2 {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.portfolio-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.portfolio-item {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.portfolio-item.is-selected {
+  border-color: rgba(0, 100, 255, 0.55);
+  background: #f7fbff;
+  box-shadow: 0 0 0 3px rgba(0, 100, 255, 0.08);
+}
+
+.portfolio-item span,
+.portfolio-item small,
+.detail-copy {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.portfolio-item small {
+  font-weight: 800;
+}
+
+.invest-checkout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+}
+
+.checkout-media {
+  height: 220px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  background-position: center;
+  background-size: cover;
+}
+
+.selection > .badge {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 12px;
+}
+
+.selection > .panel-heading {
+  margin-top: 0;
+}
+
+.detail-copy {
+  margin: 12px 0 0;
+}
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.plan {
+  min-height: 134px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.plan.is-selected {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.plan strong {
+  color: var(--blue);
+  font-size: 20px;
+}
+
+.plan small {
+  color: var(--subtle);
+  line-height: 1.45;
+}
+
+.payment-panel {
+  border-width: 0 0 0 1px;
+  border-radius: 0 8px 8px 0;
+  box-shadow: none;
+}
+
+.order-summary {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 0;
+}
+
+.order-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.order-summary dt {
+  color: var(--subtle);
+  font-size: 14px;
+}
+
+.order-summary dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.order-summary strong {
+  color: var(--blue);
+  font-size: 20px;
+}
+
+.payment-placeholder {
+  display: grid;
+  gap: 6px;
+  margin: 22px 0 12px;
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.payment-placeholder strong {
+  color: var(--ink);
+}
+
+.payment-panel > button {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #ffffff;
+  font-weight: 900;
 }
 
 .register-panel h2,
@@ -636,12 +843,21 @@ button {
   border-radius: 8px;
   padding: 14px;
   background: #ffffff;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .asset-options label.selected {
   border-color: rgba(0, 100, 255, 0.55);
   background: #f7fbff;
   box-shadow: 0 0 0 3px rgba(0, 100, 255, 0.08);
+}
+
+.asset-options label:hover {
+  border-color: rgba(0, 100, 255, 0.42);
 }
 
 .asset-options input {
@@ -741,16 +957,28 @@ button {
   }
 
   .section-heading,
-  .registration-layout {
+  .registration-layout,
+  .invest-hero {
     display: grid;
+  }
+
+  .invest-hero .secondary-link {
+    justify-self: start;
   }
 
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .registration-layout {
+  .registration-layout,
+  .invest-layout,
+  .invest-checkout {
     grid-template-columns: 1fr;
+  }
+
+  .payment-panel {
+    border-width: 1px 0 0;
+    border-radius: 0 0 8px 8px;
   }
 }
 
@@ -840,7 +1068,8 @@ button {
   }
 
   .offering,
-  .register-page {
+  .register-page,
+  .invest-page {
     width: min(100% - 32px, 1120px);
   }
 
@@ -852,7 +1081,12 @@ button {
 
   .product-grid,
   .asset-options,
-  .form-grid {
+  .form-grid,
+  .plans {
     grid-template-columns: 1fr;
+  }
+
+  .checkout-media {
+    height: 176px;
   }
 }

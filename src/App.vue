@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import AuthView from './views/AuthView.vue'
 import HomeView from './views/HomeView.vue'
+import InvestView from './views/InvestView.vue'
 import RegisterProductView from './views/RegisterProductView.vue'
 
 const activeView = ref('products')
@@ -10,6 +11,10 @@ const activeView = ref('products')
 const currentView = computed(() => {
   if (activeView.value === 'register') {
     return RegisterProductView
+  }
+
+  if (activeView.value === 'invest') {
+    return InvestView
   }
 
   if (activeView.value === 'auth') {
