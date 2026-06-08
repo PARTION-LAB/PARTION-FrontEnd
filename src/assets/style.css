@@ -569,6 +569,12 @@ button {
   padding: 78px 0 96px;
 }
 
+.board-page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 78px 0 96px;
+}
+
 .page-hero {
   max-width: 760px;
 }
@@ -628,7 +634,10 @@ button {
 .market-board,
 .order-book-panel,
 .trade-form,
-.trade-history > div {
+.trade-history > div,
+.board-compose,
+.board-feed,
+.board-post {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -1061,6 +1070,191 @@ button {
   margin-top: 16px;
 }
 
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 28px;
+}
+
+.board-layout.compose-open {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
+.board-compose,
+.board-feed {
+  padding: 24px;
+}
+
+.board-feed-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.board-feed-heading > strong {
+  color: var(--blue);
+  font-size: 18px;
+}
+
+.board-feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.board-compose form {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.board-compose label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.board-compose input,
+.board-compose select,
+.board-compose textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.board-compose textarea {
+  min-height: 150px;
+  padding: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.board-compose button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.board-compose .form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.board-compose .form-actions .secondary-link {
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--blue);
+}
+
+.board-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--surface-soft);
+}
+
+.board-preview strong {
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.board-preview span {
+  color: var(--subtle);
+  font-size: 14px;
+}
+
+.board-list {
+  display: grid;
+  gap: 12px;
+}
+
+.board-post {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  cursor: pointer;
+}
+
+.board-post.is-pinned {
+  border-color: #b2f2bb;
+  background: #f4fff6;
+}
+
+.board-post.is-selected {
+  border-color: rgba(0, 100, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 100, 255, 0.08);
+}
+
+.board-post-meta {
+  color: var(--subtle);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.board-post h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.board-post p {
+  margin: 0;
+  color: #333d4b;
+  line-height: 1.65;
+}
+
+.board-post-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--subtle);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.board-post-actions button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.board-post-actions button.selected {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
 .register-panel h2,
 .registered-panel h2 {
   margin: 0;
@@ -1236,7 +1430,8 @@ button {
   .invest-checkout,
   .market-layout,
   .market-grid,
-  .trade-history {
+  .trade-history,
+  .board-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1334,7 +1529,8 @@ button {
   .offering,
   .register-page,
   .invest-page,
-  .market-page {
+  .market-page,
+  .board-page {
     width: min(100% - 32px, 1120px);
   }
 
@@ -1358,5 +1554,16 @@ button {
 
   .checkout-media {
     height: 176px;
+  }
+
+  .board-feed-heading,
+  .board-post-actions {
+    align-items: start;
+    justify-content: start;
+  }
+
+  .board-feed-actions,
+  .board-compose .form-actions {
+    display: grid;
   }
 }
