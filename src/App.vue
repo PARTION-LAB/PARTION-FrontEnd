@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import AuthView from './views/AuthView.vue'
+import BoardView from './views/BoardView.vue'
 import HomeView from './views/HomeView.vue'
 import InvestView from './views/InvestView.vue'
 import MarketView from './views/MarketView.vue'
@@ -20,6 +21,10 @@ const currentView = computed(() => {
 
   if (activeView.value === 'market') {
     return MarketView
+  }
+
+  if (activeView.value === 'board') {
+    return BoardView
   }
 
   if (activeView.value === 'auth') {
