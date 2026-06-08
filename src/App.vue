@@ -5,6 +5,7 @@ import AuthView from './views/AuthView.vue'
 import BoardView from './views/BoardView.vue'
 import HomeView from './views/HomeView.vue'
 import InvestView from './views/InvestView.vue'
+import LedgerView from './views/LedgerView.vue'
 import MarketView from './views/MarketView.vue'
 import RegisterProductView from './views/RegisterProductView.vue'
 
@@ -25,6 +26,10 @@ const currentView = computed(() => {
 
   if (activeView.value === 'board') {
     return BoardView
+  }
+
+  if (activeView.value === 'ledger') {
+    return LedgerView
   }
 
   if (activeView.value === 'auth') {
