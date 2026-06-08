@@ -18,5 +18,14 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
-      - run: npm run build
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
