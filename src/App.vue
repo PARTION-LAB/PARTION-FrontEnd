@@ -4,6 +4,7 @@ import AppHeader from './components/layout/AppHeader.vue'
 import AuthView from './views/AuthView.vue'
 import HomeView from './views/HomeView.vue'
 import InvestView from './views/InvestView.vue'
+import MarketView from './views/MarketView.vue'
 import RegisterProductView from './views/RegisterProductView.vue'
 
 const activeView = ref('products')
@@ -15,6 +16,10 @@ const currentView = computed(() => {
 
   if (activeView.value === 'invest') {
     return InvestView
+  }
+
+  if (activeView.value === 'market') {
+    return MarketView
   }
 
   if (activeView.value === 'auth') {

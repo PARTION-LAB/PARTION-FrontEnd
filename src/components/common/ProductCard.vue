@@ -9,7 +9,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['invest'])
+const emit = defineEmits(['invest', 'trade'])
 
 const progress = computed(() => {
   return Math.min(
@@ -68,7 +68,7 @@ const progress = computed(() => {
         type="button"
         class="action-button"
         :class="{ secondary: !product.open }"
-        @click="product.open && emit('invest')"
+        @click="product.open ? emit('invest') : emit('trade')"
       >
         {{ product.action }}
       </button>
