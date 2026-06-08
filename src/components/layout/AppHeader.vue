@@ -58,7 +58,13 @@ function go(view) {
       >
         거래
       </button>
-      <button type="button">게시판</button>
+      <button
+        type="button"
+        :class="{ active: activeView === 'board' }"
+        @click="go('board')"
+      >
+        게시판
+      </button>
       <button type="button">원장</button>
     </nav>
     <button class="nav-login-button" type="button" @click="go('auth')">
