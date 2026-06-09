@@ -6,13 +6,26 @@ defineProps({
     type: String,
     required: true,
   },
+  isAuthenticated: {
+    type: Boolean,
+    default: false,
+  },
+  user: {
+    type: Object,
+    default: null,
+  },
 })
 
-const emit = defineEmits(['navigate'])
+const emit = defineEmits(['logout', 'navigate'])
 const isMenuOpen = ref(false)
 
 function go(view) {
   emit('navigate', view)
+  isMenuOpen.value = false
+}
+
+function logout() {
+  emit('logout')
   isMenuOpen.value = false
 }
 </script>
@@ -73,9 +86,21 @@ function go(view) {
         원장
       </button>
     </nav>
-    <button class="nav-login-button" type="button" @click="go('auth')">
-      <span>로그인</span>
-      <strong>회원가입</strong>
-    </button>
+    <div v-if="isAuthenticated" class="nav-user-area">
+      <button class="nav-user-button" type="button" @click="go('profile')">
+        내 정보
+      </button>
+      <button class="nav-logout-button" type="button" @click="logout">
+        로그아웃
+      </button>
+    </div>
+    <div v-else class="nav-auth-area">
+      <button class="nav-login-button" type="button" @click="go('login')">
+        로그인
+      </button>
+      <button class="nav-signup-button" type="button" @click="go('signup')">
+        회원가입
+      </button>
+    </div>
   </header>
 </template>
