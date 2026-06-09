@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "mock:api": "node scripts/mock-api-server.js",
     "build": "vite build",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",

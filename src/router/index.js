@@ -5,6 +5,7 @@ import HomeView from '../views/HomeView.vue'
 import InvestView from '../views/InvestView.vue'
 import LedgerView from '../views/LedgerView.vue'
 import MarketView from '../views/MarketView.vue'
+import ProfileView from '../views/ProfileView.vue'
 import RegisterProductView from '../views/RegisterProductView.vue'
 
 const routes = [
@@ -39,8 +40,25 @@ const routes = [
     meta: { navKey: 'ledger' },
   },
   {
+    path: '/profile',
+    name: 'profile',
+    component: ProfileView,
+    meta: { navKey: 'profile' },
+  },
+  {
     path: '/auth',
     name: 'auth',
+    redirect: '/login',
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: AuthView,
+    meta: { navKey: 'auth' },
+  },
+  {
+    path: '/signup',
+    name: 'signup',
     component: AuthView,
     meta: { navKey: 'auth' },
   },
