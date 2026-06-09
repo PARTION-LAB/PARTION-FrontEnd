@@ -1,5 +1,13 @@
 <script setup>
+import { computed, ref } from 'vue'
+
 const emit = defineEmits(['navigate'])
+
+const authMode = ref('login')
+
+const isLogin = computed(() => authMode.value === 'login')
+const title = computed(() => (isLogin.value ? '로그인하고 투자를 이어가세요' : '회원가입하고 투자를 시작하세요'))
+const submitLabel = computed(() => (isLogin.value ? '로그인' : '회원가입'))
 </script>
 
 <template>
@@ -9,15 +17,29 @@ const emit = defineEmits(['navigate'])
         Partion
       </button>
       <p class="eyebrow">회원 인증</p>
-      <h1>로그인하고 투자를 이어가세요</h1>
+      <h1>{{ title }}</h1>
 
       <div class="auth-tabs">
-        <button type="button">로그인</button>
-        <button type="button" class="selected">회원가입</button>
+        <button
+          type="button"
+          :class="{ selected: isLogin }"
+          :aria-pressed="isLogin"
+          @click="authMode = 'login'"
+        >
+          로그인
+        </button>
+        <button
+          type="button"
+          :class="{ selected: !isLogin }"
+          :aria-pressed="!isLogin"
+          @click="authMode = 'signup'"
+        >
+          회원가입
+        </button>
       </div>
 
-      <form class="auth-form">
-        <label>
+      <form class="auth-form" @submit.prevent>
+        <label v-if="!isLogin">
           <span>이름</span>
           <input type="text" autocomplete="name" />
         </label>
@@ -27,9 +49,12 @@ const emit = defineEmits(['navigate'])
         </label>
         <label>
           <span>비밀번호</span>
-          <input type="password" autocomplete="new-password" />
+          <input
+            type="password"
+            :autocomplete="isLogin ? 'current-password' : 'new-password'"
+          />
         </label>
-        <button type="button">로그인</button>
+        <button type="submit">{{ submitLabel }}</button>
       </form>
 
       <div class="social-login">
