@@ -1,9 +1,18 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { createProduct, getMyProducts, uploadProductImage } from '../api/products'
+import { useAuth } from '../composables/useAuth'
 
 const emit = defineEmits(['navigate'])
+const { isAuthenticated } = useAuth()
 
 const selectedAssetType = ref('부동산')
+const formValues = ref({})
+const imageFile = ref(null)
+const message = ref('')
+const isSubmitting = ref(false)
+const isLoadingMyProducts = ref(false)
+const myProducts = ref([])
 
 const assetTypeOptions = [
   {
@@ -99,6 +108,142 @@ const selectedConfig = computed(() => {
     assetTypeOptions[0]
   )
 })
+
+const categoryByAssetType = {
+  부동산: 'REAL_ESTATE',
+  미술품: 'ART',
+  음악저작권: 'MUSIC',
+}
+
+const extraInfoFieldByAssetType = {
+  부동산: '건물 위치',
+  미술품: '작가명',
+  음악저작권: '아티스트',
+}
+
+const visibleMessage = computed(() => {
+  if (message.value) {
+    return message.value
+  }
+
+  return isAuthenticated.value ? '' : '로그인 후 상품을 등록할 수 있습니다.'
+})
+
+function updateField(label, value) {
+  formValues.value = {
+    ...formValues.value,
+    [label]: value,
+  }
+}
+
+function readField(label) {
+  return formValues.value[label] || ''
+}
+
+function toNumber(value) {
+  const parsed = Number(String(value || '').replace(/,/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getDeadline() {
+  return readField('모집 마감일') || readField('거래 시작일') || ''
+}
+
+function getExpectedYield() {
+  const numericYield = toNumber(readField('예상 연 수익률'))
+
+  if (numericYield > 0) {
+    return numericYield
+  }
+
+  const displayValue = readField('예상 수익 표시')
+  const match = displayValue.match(/\\d+(\\.\\d+)?/)
+  return match ? Number(match[0]) : 0
+}
+
+function validateForm() {
+  if (!isAuthenticated.value) {
+    return '로그인 후 상품을 등록할 수 있습니다.'
+  }
+
+  if (!readField('상품명').trim() || !readField('상품 요약').trim()) {
+    return '상품명과 상품 요약을 입력해주세요.'
+  }
+
+  if (toNumber(readField('목표 투자금')) <= 0 || toNumber(readField('토큰 단가')) <= 0) {
+    return '목표 투자금과 토큰 단가는 0보다 크게 입력해주세요.'
+  }
+
+  if (!getDeadline()) {
+    return '모집 마감일 또는 거래 시작일을 입력해주세요.'
+  }
+
+  return ''
+}
+
+async function loadMyProducts() {
+  if (!isAuthenticated.value) {
+    myProducts.value = []
+    return
+  }
+
+  isLoadingMyProducts.value = true
+
+  try {
+    const page = await getMyProducts({ page: 0, size: 5 })
+    myProducts.value = page.content
+  } catch {
+    myProducts.value = []
+  } finally {
+    isLoadingMyProducts.value = false
+  }
+}
+
+function handleImageFileChange(event) {
+  imageFile.value = event.target.files?.[0] || null
+}
+
+async function submitProduct() {
+  const validationMessage = validateForm()
+
+  if (validationMessage) {
+    message.value = validationMessage
+    return
+  }
+
+  isSubmitting.value = true
+  message.value = imageFile.value ? '이미지를 업로드하고 상품을 등록하는 중입니다.' : '상품을 등록하는 중입니다.'
+
+  try {
+    const imageUrl = imageFile.value
+      ? await uploadProductImage(imageFile.value)
+      : readField('대표 이미지 URL')
+
+    await createProduct({
+      category: categoryByAssetType[selectedAssetType.value],
+      name: readField('상품명').trim(),
+      summary: readField('상품 요약').trim(),
+      description: readField('권리 구조') || readField('상품 요약').trim(),
+      imageUrl,
+      extraInfo: readField(extraInfoFieldByAssetType[selectedAssetType.value]),
+      targetAmount: toNumber(readField('목표 투자금')),
+      tokenPrice: toNumber(readField('토큰 단가')),
+      expectedYield: getExpectedYield(),
+      deadline: getDeadline(),
+    })
+
+    formValues.value = {}
+    imageFile.value = null
+    message.value = '상품이 등록되었습니다.'
+    await loadMyProducts()
+  } catch (error) {
+    message.value = error.message || '상품을 등록하지 못했습니다.'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+onMounted(loadMyProducts)
 </script>
 
 <template>
@@ -116,9 +261,9 @@ const selectedConfig = computed(() => {
     <section class="registration-layout">
       <article class="register-panel">
         <h2>상품 정보</h2>
-        <p class="message">로그인 후 상품을 등록할 수 있습니다.</p>
+        <p v-if="visibleMessage" class="message">{{ visibleMessage }}</p>
 
-        <form class="register-form">
+        <form class="register-form" @submit.prevent="submitProduct">
           <section class="form-section">
             <p class="eyebrow">Asset Type</p>
             <h3>등록할 상품군</h3>
@@ -148,7 +293,12 @@ const selectedConfig = computed(() => {
             <h3>기본 정보</h3>
             <label v-for="([label, placeholder]) in selectedConfig.basicFields" :key="label">
               <span>{{ label }}</span>
-              <input :placeholder="placeholder" type="text" />
+              <input
+                :value="readField(label)"
+                :placeholder="placeholder"
+                type="text"
+                @input="updateField(label, $event.target.value)"
+              />
             </label>
           </section>
 
@@ -158,7 +308,15 @@ const selectedConfig = computed(() => {
             <div class="form-grid">
               <label v-for="([label, placeholder]) in selectedConfig.assetFields" :key="label">
                 <span>{{ label }}</span>
-                <input :placeholder="placeholder" />
+                <input
+                  :value="readField(label)"
+                  :placeholder="placeholder"
+                  @input="updateField(label, $event.target.value)"
+                />
+              </label>
+              <label>
+                <span>대표 이미지 파일</span>
+                <input accept="image/*" type="file" @change="handleImageFileChange" />
               </label>
             </div>
           </section>
@@ -169,7 +327,11 @@ const selectedConfig = computed(() => {
             <div class="form-grid">
               <label v-for="([label, placeholder]) in selectedConfig.termFields" :key="label">
                 <span>{{ label }}</span>
-                <input :placeholder="placeholder" />
+                <input
+                  :value="readField(label)"
+                  :placeholder="placeholder"
+                  @input="updateField(label, $event.target.value)"
+                />
               </label>
             </div>
           </section>
@@ -177,15 +339,27 @@ const selectedConfig = computed(() => {
           <details class="extra-details">
             <summary>상세 설명 더 입력하기</summary>
           </details>
-          <button class="submit-button" type="button">
-            {{ selectedConfig.submitLabel }}
+          <button class="submit-button" type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? '등록 중...' : selectedConfig.submitLabel }}
           </button>
         </form>
       </article>
 
       <aside class="registered-panel">
         <h2>내가 등록한 상품</h2>
-        <p>아직 등록한 상품이 없습니다.</p>
+        <p v-if="isLoadingMyProducts">등록한 상품을 불러오는 중입니다.</p>
+        <p v-else-if="!myProducts.length">아직 등록한 상품이 없습니다.</p>
+        <div v-else class="portfolio-list" aria-label="내가 등록한 상품">
+          <article
+            v-for="product in myProducts"
+            :key="product.productId"
+            class="portfolio-item"
+          >
+            <strong>{{ product.name }}</strong>
+            <span>{{ product.category }} · {{ product.statusLabel || product.status }}</span>
+            <small>{{ product.subscriptionPeriod }}</small>
+          </article>
+        </div>
         <button type="button" @click="emit('navigate', 'products')">상품 목록 보기</button>
       </aside>
     </section>

@@ -1,19 +1,23 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { products } from '../data/products'
+import { computed, onMounted, ref, watch } from 'vue'
+import { getProducts } from '../api/products'
+import { products as mockProducts } from '../data/products'
 import { formatHundredMillion, formatWon } from '../utils/formatters'
 
 const emit = defineEmits(['navigate'])
 
-const investableProducts = products.filter((product) => product.open)
-const selectedSymbol = ref(investableProducts[0]?.symbol || products[0]?.symbol)
+const products = ref(mockProducts)
+const isLoadingProducts = ref(false)
+const productMessage = ref('')
+const investableProducts = computed(() => products.value.filter((product) => product.open))
+const selectedSymbol = ref(mockProducts.find((product) => product.open)?.symbol || mockProducts[0]?.symbol)
 const selectedPlanIndex = ref(1)
 
 const selectedProduct = computed(() => {
   return (
-    products.find((product) => product.symbol === selectedSymbol.value) ||
-    investableProducts[0] ||
-    products[0]
+    products.value.find((product) => product.symbol === selectedSymbol.value) ||
+    investableProducts.value[0] ||
+    products.value[0]
   )
 })
 
@@ -91,6 +95,26 @@ const projectedProgress = computed(() => {
 watch(selectedSymbol, () => {
   selectedPlanIndex.value = 1
 })
+
+async function loadInvestableProducts() {
+  isLoadingProducts.value = true
+  productMessage.value = ''
+
+  try {
+    const page = await getProducts({ status: 'FUNDING', page: 0, size: 20 })
+
+    if (page.content.length) {
+      products.value = page.content
+      selectedSymbol.value = page.content.find((product) => product.open)?.symbol || page.content[0]?.symbol
+    }
+  } catch (error) {
+    productMessage.value = `${error.message || '상품 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
+  } finally {
+    isLoadingProducts.value = false
+  }
+}
+
+onMounted(loadInvestableProducts)
 </script>
 
 <template>
@@ -116,6 +140,8 @@ watch(selectedSymbol, () => {
           <h2>투자 상품</h2>
         </div>
         <div class="portfolio-list" aria-label="투자 상품 선택">
+          <p v-if="isLoadingProducts" class="message">상품 목록을 불러오는 중입니다.</p>
+          <p v-else-if="productMessage" class="message">{{ productMessage }}</p>
           <button
             v-for="product in investableProducts"
             :key="product.symbol"
@@ -125,7 +151,7 @@ watch(selectedSymbol, () => {
             @click="selectedSymbol = product.symbol"
           >
             <strong>{{ product.name }}</strong>
-            <span>{{ product.category }} · {{ product.status }}</span>
+            <span>{{ product.category }} · {{ product.statusLabel || product.status }}</span>
             <small>
               {{ formatHundredMillion(product.fundedAmount) }} /
               {{ formatHundredMillion(product.targetAmount) }}
@@ -142,7 +168,7 @@ watch(selectedSymbol, () => {
             aria-hidden="true"
           ></div>
           <span class="badge">
-            {{ selectedProduct.category }} · {{ selectedProduct.status }}
+            {{ selectedProduct.category }} · {{ selectedProduct.statusLabel || selectedProduct.status }}
           </span>
           <div class="panel-heading">
             <p class="eyebrow">투자 정보</p>
