@@ -474,7 +474,7 @@ function addLedgerBlock(eventType, payload) {
 async function handleAuth(request, response, url) {
   const { pathname } = url
 
-  if (request.method === 'POST' && pathname === '/api/auth/register') {
+  if (request.method === 'POST' && pathname === '/api/auth/signup') {
     const body = await readBody(request, response)
     if (!body) return
 
