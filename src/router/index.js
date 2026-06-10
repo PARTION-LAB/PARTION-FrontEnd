@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AuthView from '../views/AuthView.vue'
+import BoardDetailView from '../views/BoardDetailView.vue'
 import BoardView from '../views/BoardView.vue'
+import BoardWriteView from '../views/BoardWriteView.vue'
 import HomeView from '../views/HomeView.vue'
 import InvestView from '../views/InvestView.vue'
 import LedgerView from '../views/LedgerView.vue'
@@ -31,6 +33,18 @@ const routes = [
     path: '/board',
     name: 'board',
     component: BoardView,
+    meta: { navKey: 'board' },
+  },
+  {
+    path: '/board/write',
+    name: 'board-write',
+    component: BoardWriteView,
+    meta: { navKey: 'board' },
+  },
+  {
+    path: '/board/:boardId',
+    name: 'board-detail',
+    component: BoardDetailView,
     meta: { navKey: 'board' },
   },
   {

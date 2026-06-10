@@ -1005,8 +1005,14 @@ async function handleBoards(request, response, url) {
   }
 
   if (request.method === 'POST' && pathname === '/api/boards') {
+    const user = getAuthenticatedUser(request)
     const body = await readBody(request, response)
     if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
 
     if (!body.title || !body.content) {
       fail(response, 400, '게시글 정보를 확인해주세요')
@@ -1018,8 +1024,8 @@ async function handleBoards(request, response, url) {
       category: body.category || 'FREE',
       title: body.title,
       content: body.content,
-      writerId: 1,
-      writerNickname: 'user123',
+      writerId: user.id,
+      writerNickname: user.nickname,
       createdAt: nowIso(),
       updatedAt: nowIso(),
       viewCount: 0,
@@ -1045,14 +1051,20 @@ async function handleBoards(request, response, url) {
   }
 
   if (request.method === 'DELETE' && /^\/api\/boards\/\d+$/.test(pathname)) {
-    const index = boards.findIndex((item) => item.id === Number(pathname.split('/').at(-1)))
+    const boardId = Number(pathname.split('/').at(-1))
+    const index = boards.findIndex((item) => item.id === boardId)
     if (index === -1) {
       fail(response, 404, '게시글을 찾을 수 없습니다')
       return
     }
 
     boards.splice(index, 1)
-    ok(response, null)
+    for (let index = comments.length - 1; index >= 0; index -= 1) {
+      if (comments[index].boardId === boardId) {
+        comments.splice(index, 1)
+      }
+    }
+    ok(response, null, 204)
     return
   }
 
@@ -1064,8 +1076,14 @@ async function handleBoards(request, response, url) {
 
   if (request.method === 'POST' && /^\/api\/boards\/\d+\/comments$/.test(pathname)) {
     const boardId = Number(pathname.split('/')[3])
+    const user = getAuthenticatedUser(request)
     const body = await readBody(request, response)
     if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
 
     if (!body.content) {
       fail(response, 400, '댓글 내용을 입력해주세요')
@@ -1076,8 +1094,8 @@ async function handleBoards(request, response, url) {
       id: nextCommentId,
       boardId,
       content: body.content,
-      writerId: 1,
-      writerNickname: 'user123',
+      writerId: user.id,
+      writerNickname: user.nickname,
       createdAt: nowIso(),
     }
     nextCommentId += 1
@@ -1094,7 +1112,7 @@ async function handleBoards(request, response, url) {
     }
 
     comments.splice(index, 1)
-    ok(response, null)
+    ok(response, null, 204)
   }
 }
 
