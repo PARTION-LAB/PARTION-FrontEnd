@@ -1033,20 +1033,18 @@ button {
   font-size: 20px;
 }
 
-.payment-placeholder {
+.toss-widget-box {
   display: grid;
-  gap: 6px;
+  gap: 12px;
   margin: 22px 0 12px;
+}
+
+.toss-widget-box > div {
+  min-height: 84px;
   border-radius: 8px;
   padding: 16px;
   background: var(--surface-soft);
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.payment-placeholder strong {
-  color: var(--ink);
+  overflow: hidden;
 }
 
 .payment-panel > button {
@@ -1057,6 +1055,44 @@ button {
   background: var(--blue);
   color: #ffffff;
   font-weight: 900;
+}
+
+.payment-panel > button:disabled {
+  cursor: not-allowed;
+  background: #9ca3af;
+}
+
+.payment-result-page {
+  display: grid;
+  min-height: calc(100vh - 86px);
+  place-items: center;
+  padding: 48px 20px;
+}
+
+.payment-result-panel {
+  width: min(560px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 32px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.payment-result-panel h1 {
+  margin: 8px 0 12px;
+  color: var(--ink);
+  font-size: 32px;
+}
+
+.payment-result-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.payment-result-panel .secondary-link {
+  margin-top: 24px;
+  width: 100%;
 }
 
 .account,
