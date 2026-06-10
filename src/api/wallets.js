@@ -115,56 +115,29 @@ async function handleResponse(response, fallback) {
   return getResponseData(data)
 }
 
-export async function getTossClientConfig() {
-  return handleResponse(await request('/api/config'), '결제 설정을 불러오지 못했습니다.')
+export function normalizeWallet(wallet) {
+  if (!wallet) {
+    return null
+  }
+
+  const availableBalance = Number(wallet.availableBalance ?? 0)
+  const lockedBalance = Number(wallet.lockedBalance ?? 0)
+
+  return {
+    ...wallet,
+    walletId: wallet.walletId ?? wallet.id,
+    memberId: wallet.memberId,
+    availableBalance,
+    lockedBalance,
+    totalBalance: Number(wallet.totalBalance ?? wallet.balance ?? availableBalance + lockedBalance),
+  }
 }
 
-export async function savePaymentAmount(payload) {
-  return handleResponse(
-    await request('/api/payments/save-amount', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '결제 정보를 저장하지 못했습니다.',
-  )
-}
-
-export async function createDepositRequest(payload) {
-  return handleResponse(
-    await request('/api/payments/deposits/ready', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '충전 요청을 생성하지 못했습니다.',
-  )
-}
-
-export async function verifyPaymentAmount(payload) {
-  return handleResponse(
-    await request('/api/payments/verify-amount', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '결제 금액을 확인하지 못했습니다.',
-  )
-}
-
-export async function confirmPayment(payload) {
-  return handleResponse(
-    await request('/api/payments/confirm', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '결제를 승인하지 못했습니다.',
-  )
-}
-
-export async function confirmDepositPayment(payload) {
-  return handleResponse(
-    await request('/api/payments/deposits/confirm', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    'Toss 결제 승인을 확인하지 못했습니다.',
+export async function getMyWallet() {
+  return normalizeWallet(
+    await handleResponse(
+      await request('/api/wallets/me', {}, { auth: true }),
+      '내 지갑 정보를 불러오지 못했습니다.',
+    ),
   )
 }

@@ -1,30 +1,56 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { confirmPayment, verifyPaymentAmount } from '../api/payments'
+import { createInvestment } from '../api/investments'
+import { confirmDepositPayment } from '../api/payments'
 import { formatWon } from '../utils/formatters'
 
 const route = useRoute()
 const status = ref('pending')
 const message = ref('결제 승인 정보를 확인하고 있습니다.')
+const investment = ref(null)
+const pendingInvestmentStorageKey = 'partionPendingInvestmentOrder'
 
 const paymentKey = computed(() => String(route.query.paymentKey || ''))
 const orderId = computed(() => String(route.query.orderId || ''))
 const amount = computed(() => Number(route.query.amount || 0))
 
+function getPendingInvestment() {
+  const saved = globalThis.sessionStorage.getItem(pendingInvestmentStorageKey)
+
+  if (!saved) {
+    return null
+  }
+
+  try {
+    return JSON.parse(saved)
+  } catch {
+    globalThis.sessionStorage.removeItem(pendingInvestmentStorageKey)
+    return null
+  }
+}
+
 onMounted(async () => {
   try {
-    await verifyPaymentAmount({
-      orderId: orderId.value,
-      amount: amount.value,
-    })
-    await confirmPayment({
+    const pendingInvestment = getPendingInvestment()
+    await confirmDepositPayment({
       paymentKey: paymentKey.value,
       orderId: orderId.value,
       amount: amount.value,
     })
+
+    if (pendingInvestment?.productId && pendingInvestment?.quantity) {
+      investment.value = await createInvestment({
+        productId: pendingInvestment.productId,
+        quantity: pendingInvestment.quantity,
+      })
+      globalThis.sessionStorage.removeItem(pendingInvestmentStorageKey)
+    }
+
     status.value = 'success'
-    message.value = '투자 결제가 완료되었습니다.'
+    message.value = investment.value
+      ? '예치금 충전 후 투자가 완료되었습니다.'
+      : '예치금 충전이 완료되었습니다.'
   } catch (error) {
     status.value = 'error'
     message.value = error.message || '결제 승인 처리에 실패했습니다.'
@@ -49,6 +75,10 @@ onMounted(async () => {
           <dd>
             <strong>{{ formatWon(amount) }}</strong>
           </dd>
+        </div>
+        <div v-if="investment">
+          <dt>투자 수량</dt>
+          <dd>{{ investment.quantity }}토큰</dd>
         </div>
       </dl>
 
