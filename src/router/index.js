@@ -7,6 +7,7 @@ import HomeView from '../views/HomeView.vue'
 import InvestView from '../views/InvestView.vue'
 import LedgerView from '../views/LedgerView.vue'
 import MarketView from '../views/MarketView.vue'
+import ProductDetailView from '../views/ProductDetailView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import RegisterProductView from '../views/RegisterProductView.vue'
 
@@ -15,6 +16,12 @@ const routes = [
     path: '/',
     name: 'products',
     component: HomeView,
+    meta: { navKey: 'products' },
+  },
+  {
+    path: '/products/:productId',
+    name: 'product-detail',
+    component: ProductDetailView,
     meta: { navKey: 'products' },
   },
   {

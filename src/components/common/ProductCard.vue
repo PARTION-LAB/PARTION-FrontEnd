@@ -9,7 +9,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['invest', 'trade'])
+const emit = defineEmits(['detail', 'invest', 'trade'])
 
 const progress = computed(() => {
   return Math.min(
@@ -28,7 +28,7 @@ const progress = computed(() => {
       aria-hidden="true"
     ></div>
     <span class="badge" :class="{ muted: !product.open }">
-      {{ product.category }} · {{ product.status }}
+      {{ product.category }} · {{ product.statusLabel || product.status }}
     </span>
     <h3>{{ product.name }}</h3>
     <p class="summary">{{ product.summary }}</p>
@@ -63,7 +63,7 @@ const progress = computed(() => {
     </dl>
 
     <div class="product-actions">
-      <button type="button" class="ghost-button">상세보기</button>
+      <button type="button" class="ghost-button" @click="emit('detail')">상세보기</button>
       <button
         type="button"
         class="action-button"

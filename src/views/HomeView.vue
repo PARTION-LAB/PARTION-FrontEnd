@@ -1,27 +1,56 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { getProducts } from '../api/products'
 import ProductCard from '../components/common/ProductCard.vue'
-import { products } from '../data/products'
+import { products as mockProducts } from '../data/products'
 
 const emit = defineEmits(['navigate'])
+const router = useRouter()
 const selectedCategory = ref('전체')
 const categories = ['전체', '부동산', '미술품', '음악저작권']
+const products = ref(mockProducts)
+const isLoadingProducts = ref(false)
+const productMessage = ref('')
 
 const visibleProducts = computed(() => {
   if (selectedCategory.value === '전체') {
-    return products
+    return products.value
   }
 
-  return products.filter((product) => product.category === selectedCategory.value)
+  return products.value.filter((product) => product.category === selectedCategory.value)
 })
 
 function countByCategory(category) {
   if (category === '전체') {
-    return products.length
+    return products.value.length
   }
 
-  return products.filter((product) => product.category === category).length
+  return products.value.filter((product) => product.category === category).length
 }
+
+function goProductDetail(product) {
+  router.push(`/products/${product.productId || product.id}`)
+}
+
+async function loadProducts() {
+  isLoadingProducts.value = true
+  productMessage.value = ''
+
+  try {
+    const page = await getProducts({ page: 0, size: 20 })
+
+    if (page.content.length) {
+      products.value = page.content
+    }
+  } catch (error) {
+    productMessage.value = `${error.message || '상품 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
+  } finally {
+    isLoadingProducts.value = false
+  }
+}
+
+onMounted(loadProducts)
 </script>
 
 <template>
@@ -47,7 +76,6 @@ function countByCategory(category) {
           <h2>목표 투자금 달성률로 보는 STO 상품</h2>
         </div>
         <div class="section-actions">
-          <button type="button" class="secondary-link">매각 투표</button>
           <button type="button" class="secondary-link" @click="emit('navigate', 'register')">
             상품 등록하기
           </button>
@@ -68,11 +96,15 @@ function countByCategory(category) {
         </button>
       </div>
 
+      <p v-if="isLoadingProducts" class="message">상품 목록을 불러오는 중입니다.</p>
+      <p v-else-if="productMessage" class="message">{{ productMessage }}</p>
+
       <div class="product-grid" aria-label="투자 상품 목록">
         <ProductCard
           v-for="product in visibleProducts"
           :key="product.symbol"
           :product="product"
+          @detail="goProductDetail(product)"
           @invest="emit('navigate', 'invest')"
           @trade="emit('navigate', 'market')"
         />
