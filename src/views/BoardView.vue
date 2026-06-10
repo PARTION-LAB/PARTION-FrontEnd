@@ -1,14 +1,19 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { getBoard, getBoardComments, getBoards } from '../api/boards'
 
 const categories = ['전체', '공지', '상품토론', '수익인증', '질문', '건의']
+const apiCategoryToDisplayCategory = {
+  NOTICE: '공지',
+  QUESTION: '질문',
+  FREE: '상품토론',
+}
+const router = useRouter()
 const selectedCategory = ref('전체')
 const selectedPostId = ref(1)
-const isComposeOpen = ref(false)
-const composeCategory = ref('상품토론')
-const composeTitle = ref('')
-const composeBody = ref('')
-const composeMessage = ref('로그인 후 게시글을 작성할 수 있습니다.')
+const isLoadingPosts = ref(false)
+const loadMessage = ref('')
 
 const posts = ref([
   {
@@ -73,6 +78,50 @@ const posts = ref([
   },
 ])
 
+function createFallbackMetrics(id) {
+  const numericId = Number(id) || 1
+
+  return {
+    likes: 12 + (numericId * 17) % 92,
+    pinned: numericId === 1,
+    likedByMe: false,
+  }
+}
+
+async function normalizeBoardPost(board) {
+  const id = board.boardId ?? board.id
+  const fallback = createFallbackMetrics(id)
+  let detail
+  let commentCount
+
+  try {
+    detail = await getBoard(id)
+  } catch {
+    detail = board
+  }
+
+  try {
+    const commentsPage = await getBoardComments(id)
+    commentCount = commentsPage.totalElements
+  } catch {
+    commentCount = 0
+  }
+
+  return {
+    id,
+    category: apiCategoryToDisplayCategory[detail.category || board.category] || '상품토론',
+    title: detail.title || board.title,
+    body: detail.content || board.content || '게시글 상세 내용을 불러오는 중입니다.',
+    authorName: detail.writerNickname || board.writerNickname || `회원 ${detail.memberId || board.memberId || '-'}`,
+    memberId: detail.memberId || board.memberId,
+    createdAt: detail.createdAt || board.createdAt || new Date().toISOString(),
+    likes: fallback.likes,
+    comments: commentCount,
+    pinned: fallback.pinned,
+    likedByMe: fallback.likedByMe,
+  }
+}
+
 const visiblePosts = computed(() => {
   if (selectedCategory.value === '전체') {
     return posts.value
@@ -110,33 +159,35 @@ function toggleLike(post) {
   post.likes += post.likedByMe ? 1 : -1
 }
 
-function submitPost() {
-  if (!composeTitle.value.trim() || composeBody.value.trim().length < 10) {
-    composeMessage.value = '제목과 10자 이상의 내용을 입력하세요.'
-    return
-  }
-
-  const newPost = {
-    id: Date.now(),
-    category: composeCategory.value,
-    title: composeTitle.value.trim(),
-    body: composeBody.value.trim(),
-    authorName: '나',
-    createdAt: new Date().toISOString(),
-    likes: 0,
-    comments: 0,
-    pinned: false,
-    likedByMe: false,
-  }
-
-  posts.value = [newPost, ...posts.value]
-  selectedCategory.value = '전체'
-  selectedPostId.value = newPost.id
-  composeTitle.value = ''
-  composeBody.value = ''
-  composeMessage.value = '게시글이 임시 등록되었습니다.'
-  isComposeOpen.value = false
+function goWritePage() {
+  router.push('/board/write')
 }
+
+function goDetailPage(postId) {
+  selectedPostId.value = postId
+  router.push(`/board/${postId}`)
+}
+
+async function loadPosts() {
+  isLoadingPosts.value = true
+  loadMessage.value = ''
+
+  try {
+    const boardsPage = await getBoards({ page: 0, size: 20 })
+    const apiPosts = await Promise.all(boardsPage.content.map(normalizeBoardPost))
+
+    if (apiPosts.length) {
+      posts.value = apiPosts
+      selectedPostId.value = apiPosts[0].id
+    }
+  } catch (error) {
+    loadMessage.value = `${error.message || '게시글 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
+  } finally {
+    isLoadingPosts.value = false
+  }
+}
+
+onMounted(loadPosts)
 </script>
 
 <template>
@@ -150,66 +201,13 @@ function submitPost() {
       <button
         class="primary-link page-action-link"
         type="button"
-        @click="isComposeOpen = true"
+        @click="goWritePage"
       >
         글쓰기
       </button>
     </section>
 
-    <section class="board-layout" :class="{ 'compose-open': isComposeOpen }">
-      <aside v-if="isComposeOpen" id="board-compose" class="board-compose">
-        <div class="panel-heading">
-          <p class="eyebrow">Write</p>
-          <h2>새 글 작성</h2>
-        </div>
-        <p class="message">{{ composeMessage }}</p>
-        <form @submit.prevent="submitPost">
-          <label>
-            카테고리
-            <select v-model="composeCategory">
-              <option value="상품토론">상품토론</option>
-              <option value="수익인증">수익인증</option>
-              <option value="질문">질문</option>
-              <option value="건의">건의</option>
-            </select>
-          </label>
-          <label>
-            제목
-            <input
-              v-model="composeTitle"
-              maxlength="80"
-              placeholder="상품이나 거래 경험을 적어주세요"
-              type="text"
-            />
-          </label>
-          <label>
-            내용
-            <textarea
-              v-model="composeBody"
-              maxlength="1000"
-              placeholder="10자 이상 입력하세요"
-              rows="10"
-            ></textarea>
-          </label>
-          <div class="form-actions">
-            <button
-              class="secondary-link"
-              type="button"
-              @click="isComposeOpen = false"
-            >
-              취소
-            </button>
-            <button type="submit">게시하기</button>
-          </div>
-        </form>
-
-        <div v-if="selectedPost" class="board-preview">
-          <p class="eyebrow">Selected</p>
-          <strong>{{ selectedPost.title }}</strong>
-          <span>{{ selectedPost.category }} · 댓글 {{ selectedPost.comments }}</span>
-        </div>
-      </aside>
-
+    <section class="board-layout">
       <section class="board-feed">
         <div class="panel-heading board-feed-heading">
           <div>
@@ -221,7 +219,7 @@ function submitPost() {
             <button
               class="secondary-link"
               type="button"
-              @click="isComposeOpen = true"
+              @click="goWritePage"
             >
               새 글 작성
             </button>
@@ -242,6 +240,9 @@ function submitPost() {
           </button>
         </div>
 
+        <p v-if="isLoadingPosts" class="message">게시글을 불러오는 중입니다.</p>
+        <p v-else-if="loadMessage" class="message">{{ loadMessage }}</p>
+
         <div class="board-list">
           <article
             v-for="post in visiblePosts"
@@ -251,7 +252,7 @@ function submitPost() {
               'is-pinned': post.pinned,
               'is-selected': selectedPost?.id === post.id,
             }"
-            @click="selectedPostId = post.id"
+            @click="goDetailPage(post.id)"
           >
             <div class="board-post-meta">
               {{ post.category }} · {{ post.authorName }} · {{ formatDate(post.createdAt) }}

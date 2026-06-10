@@ -861,6 +861,8 @@ button {
 .trade-history > div,
 .board-compose,
 .board-feed,
+.board-detail-panel,
+.board-comments-panel,
 .board-post,
 .chain-metric,
 .chain-panel {
@@ -1309,8 +1311,23 @@ button {
 }
 
 .board-compose,
-.board-feed {
+.board-feed,
+.board-detail-panel,
+.board-comments-panel {
   padding: 24px;
+}
+
+.board-write-layout {
+  display: grid;
+  max-width: 720px;
+  margin-top: 28px;
+}
+
+.board-detail-layout {
+  display: grid;
+  max-width: 720px;
+  gap: 18px;
+  margin-top: 28px;
 }
 
 .board-feed-heading {
@@ -1479,6 +1496,116 @@ button {
   border-color: var(--blue);
   background: var(--blue-soft);
   color: var(--blue);
+}
+
+.board-detail-actions .danger,
+.board-comment .danger {
+  border-color: #ffd8d8;
+  background: #fff5f5;
+  color: #e03131;
+}
+
+.board-detail-title {
+  display: grid;
+  gap: 8px;
+}
+
+.board-detail-title h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.35;
+}
+
+.board-detail-body {
+  margin: 20px 0 0;
+  color: #333d4b;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.board-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.board-detail-actions .secondary-link,
+.board-comment .secondary-link {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  font-weight: 900;
+}
+
+.board-comment-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.board-comment-form textarea {
+  width: 100%;
+  min-height: 108px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.board-comment-form button {
+  justify-self: end;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 18px;
+  background: var(--ink);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.board-comment-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.board-comment {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.board-comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--subtle);
+  font-size: 13px;
+}
+
+.board-comment-meta strong {
+  color: var(--ink);
+}
+
+.board-comment p {
+  margin: 0;
+  color: #333d4b;
+  line-height: 1.65;
+}
+
+.board-comment button {
+  justify-self: end;
 }
 
 .blockchain-dashboard {

@@ -50,8 +50,10 @@ function createMockLoginResponse(email) {
       tokenType: 'Bearer',
       expiresIn: 1800,
       member: {
+        id: 1,
         email,
         nickname: 'user123',
+        role: 'ROLE_USER',
       },
     },
     error: null,
