@@ -258,6 +258,15 @@ function sendJson(response, statusCode, body) {
   response.end(statusCode === 204 ? '' : JSON.stringify(body))
 }
 
+function sendEmpty(response, statusCode = 204) {
+  response.writeHead(statusCode, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  })
+  response.end('')
+}
+
 function ok(response, data = null, statusCode = 200) {
   sendJson(response, statusCode, {
     success: true,
@@ -403,6 +412,12 @@ function validateRegisterRequest({ nickname, email, password }) {
   }
 
   return ''
+}
+
+function categoryNameFromCode(category) {
+  if (category === 'REAL_ESTATE') return '부동산'
+  if (category === 'ART') return '미술품'
+  return '음악저작권'
 }
 
 function addLedgerBlock(eventType, payload) {
@@ -590,20 +605,68 @@ async function handleMembers(request, response, url) {
 async function handleProducts(request, response, url) {
   const { pathname } = url
 
+  if (request.method === 'PUT' && pathname.startsWith('/mock-uploads/products/')) {
+    await new Promise((resolve) => {
+      request.on('data', () => {})
+      request.on('end', resolve)
+    })
+    sendEmpty(response, 200)
+    return
+  }
+
+  if (request.method === 'GET' && pathname.startsWith('/mock-assets/products/')) {
+    response.writeHead(200, {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+    })
+    response.end('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#e8f0ff"/><text x="80" y="420" font-family="Arial" font-size="64" fill="#1f2937">Partion Product</text></svg>')
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/uploads/products/presigned-url') {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const safeFileName = String(body.fileName || 'image.jpg').replace(/[^A-Za-z0-9._-]/g, '-')
+    const objectKey = `products/mock-${Date.now()}-${safeFileName}`
+
+    ok(response, {
+      presignedUrl: `http://localhost:${PORT}/mock-uploads/${objectKey}`,
+      imageUrl: `http://localhost:${PORT}/mock-assets/${objectKey}`,
+      objectKey,
+    })
+    return
+  }
+
   if (request.method === 'GET' && pathname === '/api/products') {
     const keyword = url.searchParams.get('keyword')?.toLowerCase()
     const category = url.searchParams.get('category')
+    const status = url.searchParams.get('status')
     const filtered = products.filter((product) => {
       const matchesKeyword = !keyword || product.name.toLowerCase().includes(keyword) || product.summary.toLowerCase().includes(keyword)
       const matchesCategory = !category || product.category === category || product.categoryName === category || product.categoryKey === category
-      return matchesKeyword && matchesCategory
+      const matchesStatus = !status || product.status === status || (status === 'FUNDING' && product.status === 'RECRUITING')
+      return matchesKeyword && matchesCategory && matchesStatus
     })
     ok(response, paginate(filtered, url))
     return
   }
 
   if (request.method === 'GET' && pathname === '/api/products/me') {
-    ok(response, paginate(products.filter((product) => product.issuerId === 1), url))
+    const user = getAuthenticatedUser(request)
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    ok(response, paginate(products.filter((product) => product.issuerId === user.id), url))
     return
   }
 
@@ -639,8 +702,14 @@ async function handleProducts(request, response, url) {
   }
 
   if (request.method === 'POST' && pathname === '/api/products') {
+    const user = getAuthenticatedUser(request)
     const body = await readBody(request, response)
     if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
 
     if (!body.name && !body.title) {
       fail(response, 400, '상품 정보를 확인해주세요')
@@ -654,11 +723,11 @@ async function handleProducts(request, response, url) {
       name: body.name || body.title,
       title: body.title || body.name,
       category: body.category || 'MUSIC',
-      categoryName: body.categoryName || body.category || 'MUSIC',
+      categoryName: body.categoryName || categoryNameFromCode(body.category),
       summary: body.summary || '로컬 mock 등록 상품',
       description: body.description || '로컬 mock 등록 상품 상세 설명입니다.',
       imageUrl: body.imageUrl || 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80',
-      status: 'RECRUITING',
+      status: 'FUNDING',
       unitPrice: body.unitPrice || body.tokenPrice || 10000,
       tokenPrice: body.tokenPrice || body.unitPrice || 10000,
       targetAmount: body.targetAmount || 1000000,
@@ -670,8 +739,9 @@ async function handleProducts(request, response, url) {
       open: true,
       totalTokens: Math.floor((body.targetAmount || 1000000) / (body.tokenPrice || body.unitPrice || 10000)),
       remainingTokens: Math.floor((body.targetAmount || 1000000) / (body.tokenPrice || body.unitPrice || 10000)),
-      issuerId: 1,
-      issuerNickname: 'user123',
+      issuerId: user.id,
+      issuerMemberId: user.id,
+      issuerNickname: user.nickname,
       createdAt: nowIso(),
     }
     nextProductId += 1
