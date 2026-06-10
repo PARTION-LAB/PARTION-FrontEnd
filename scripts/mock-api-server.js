@@ -781,41 +781,69 @@ async function handleProducts(request, response, url) {
 async function handleInvestments(request, response, url) {
   const { pathname } = url
 
-  if (request.method === 'GET' && pathname === '/api/investment-products') {
+  if (request.method === 'GET' && (pathname === '/api/investment-products' || pathname === '/api/investments/products')) {
     ok(response, paginate(products.filter((product) => product.open || product.status === 'RECRUITING'), url))
     return
   }
 
-  if (request.method === 'GET' && /^\/api\/investment-products\/\d+$/.test(pathname)) {
+  if (
+    request.method === 'GET' &&
+    (/^\/api\/investment-products\/\d+$/.test(pathname) || /^\/api\/investments\/products\/\d+$/.test(pathname))
+  ) {
     const product = findProduct(pathname.split('/').at(-1))
     product ? ok(response, product) : fail(response, 404, '상품을 찾을 수 없습니다')
     return
   }
 
-  if (request.method === 'POST' && /^\/api\/investment-products\/\d+\/invest$/.test(pathname)) {
-    const product = findProduct(pathname.split('/')[3])
+  if (
+    request.method === 'POST' &&
+    (pathname === '/api/investments' || /^\/api\/investment-products\/\d+\/invest$/.test(pathname))
+  ) {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const productId = pathname === '/api/investments' ? body.productId : pathname.split('/')[3]
+    const product = findProduct(productId)
     if (!product) {
       fail(response, 404, '상품을 찾을 수 없습니다')
       return
     }
 
-    const body = await readBody(request, response)
-    if (!body) return
-    const amount = Number(body.amount || body.totalAmount || product.unitPrice)
-    const quantity = Number(body.quantity || Math.max(1, Math.floor(amount / product.unitPrice)))
+    if (!product.open && product.status !== 'FUNDING' && product.status !== 'RECRUITING') {
+      fail(response, 409, '투자할 수 없는 상품입니다')
+      return
+    }
+
+    const quantity = Number(body.quantity || 0)
+    const amount = Number(body.amount || body.totalAmount || quantity * product.unitPrice)
 
     if (amount <= 0 || quantity <= 0) {
-      fail(response, 400, '투자 정보를 확인해주세요')
+      fail(response, 400, '투자 수량을 확인해주세요')
+      return
+    }
+
+    if (wallet.availableBalance < amount) {
+      fail(response, 409, '예치금 잔액이 부족합니다')
       return
     }
 
     const investment = {
       id: nextInvestmentId,
+      investmentId: nextInvestmentId,
       productId: product.id,
       productName: product.name,
       amount,
+      totalAmount: amount,
+      pricePerToken: product.unitPrice,
       quantity,
       status: 'COMPLETED',
+      createdAt: nowIso(),
       investedAt: nowIso(),
     }
     nextInvestmentId += 1
@@ -823,14 +851,32 @@ async function handleInvestments(request, response, url) {
     product.currentAmount += amount
     product.fundedAmount += amount
     product.fundingRate = Number(((product.fundedAmount / product.targetAmount) * 100).toFixed(1))
-    wallet.balance -= amount
-    wallet.availableBalance -= amount
+    if (product.fundedAmount >= product.targetAmount) {
+      product.status = 'TRADING'
+      product.open = false
+    }
+    wallet.balance = Math.max(0, wallet.balance - amount)
+    wallet.availableBalance = Math.max(0, wallet.availableBalance - amount)
     addLedgerBlock('INVESTMENT', investment)
-    ok(response, investment, 201)
+    ok(response, {
+      investmentId: investment.id,
+      productId: product.id,
+      quantity,
+      pricePerToken: product.unitPrice,
+      totalAmount: amount,
+      availableBalance: wallet.availableBalance,
+      productStatus: product.status,
+    }, 201)
     return
   }
 
   if (request.method === 'GET' && pathname === '/api/investments/me') {
+    const user = getAuthenticatedUser(request)
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
     ok(response, paginate(investments, url))
     return
   }
@@ -993,12 +1039,113 @@ async function handleWalletsAndPayments(request, response, url) {
   }
 
   if (request.method === 'GET' && pathname === '/api/wallets/me') {
-    ok(response, wallet)
+    const user = getAuthenticatedUser(request)
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    ok(response, {
+      walletId: 1,
+      memberId: wallet.memberId,
+      availableBalance: wallet.availableBalance,
+      lockedBalance: wallet.lockedBalance,
+      totalBalance: wallet.availableBalance + wallet.lockedBalance,
+    })
     return
   }
 
   if (request.method === 'GET' && pathname === '/api/wallets/me/transactions') {
     ok(response, paginate(walletTransactions, url))
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/payments/deposits/ready') {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const amount = Number(body.amount)
+    if (amount <= 0) {
+      fail(response, 400, '충전 금액을 확인해주세요')
+      return
+    }
+
+    const payment = {
+      id: nextPaymentId,
+      depositId: nextPaymentId,
+      paymentKey: null,
+      orderId: `deposit_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}_${nextPaymentId}_${Math.random().toString(16).slice(2, 8)}`,
+      amount,
+      status: 'REQUESTED',
+      method: 'TOSS',
+      requestedAt: nowIso(),
+    }
+    nextPaymentId += 1
+    payments.unshift(payment)
+    ok(response, {
+      depositId: payment.depositId,
+      orderId: payment.orderId,
+      amount: payment.amount,
+      status: payment.status,
+    }, 201)
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/payments/deposits/confirm') {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const payment = payments.find((item) => item.orderId === body.orderId)
+    if (!payment) {
+      fail(response, 400, '결제 승인 정보가 올바르지 않습니다')
+      return
+    }
+
+    if (payment.status === 'DONE') {
+      fail(response, 409, '이미 처리된 결제입니다')
+      return
+    }
+
+    const amount = Number(body.amount)
+    if (payment.amount !== amount) {
+      fail(response, 400, '결제 승인 정보가 올바르지 않습니다')
+      return
+    }
+
+    payment.paymentKey = body.paymentKey
+    payment.status = 'DONE'
+    payment.approvedAt = nowIso()
+    wallet.balance += payment.amount
+    wallet.availableBalance += payment.amount
+    walletTransactions.unshift({
+      id: walletTransactions.length + 1,
+      type: 'DEPOSIT',
+      amount: payment.amount,
+      balanceAfter: wallet.availableBalance,
+      description: 'Toss 충전 승인',
+      createdAt: nowIso(),
+    })
+    addLedgerBlock('DEPOSIT', payment)
+    ok(response, {
+      depositId: payment.depositId || payment.id,
+      orderId: payment.orderId,
+      paymentKey: payment.paymentKey,
+      amount: payment.amount,
+      status: payment.status,
+      approvedAt: payment.approvedAt,
+    })
     return
   }
 
