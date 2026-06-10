@@ -80,7 +80,7 @@ describe('AuthView', () => {
     expect(wrapper.text()).toContain('닉네임은 2자 이상 10자 이하로 입력해주세요.')
   })
 
-  it('submits signup data to the register API', async () => {
+  it('submits signup data to the signup API', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve(JSON.stringify({ success: true, response: null, error: null })),
@@ -97,7 +97,7 @@ describe('AuthView', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/register$/)
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/signup$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
       method: 'POST',
       headers: {
