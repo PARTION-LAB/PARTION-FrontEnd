@@ -7,6 +7,8 @@ import HomeView from '../views/HomeView.vue'
 import InvestView from '../views/InvestView.vue'
 import LedgerView from '../views/LedgerView.vue'
 import MarketView from '../views/MarketView.vue'
+import PaymentFailView from '../views/PaymentFailView.vue'
+import PaymentSuccessView from '../views/PaymentSuccessView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import RegisterProductView from '../views/RegisterProductView.vue'
@@ -28,6 +30,18 @@ const routes = [
     path: '/invest',
     name: 'invest',
     component: InvestView,
+    meta: { navKey: 'invest' },
+  },
+  {
+    path: '/payment/success',
+    name: 'payment-success',
+    component: PaymentSuccessView,
+    meta: { navKey: 'invest' },
+  },
+  {
+    path: '/payment/fail',
+    name: 'payment-fail',
+    component: PaymentFailView,
     meta: { navKey: 'invest' },
   },
   {
