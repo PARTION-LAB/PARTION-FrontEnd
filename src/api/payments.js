@@ -1,6 +1,7 @@
 import { reissueAccessToken } from './auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY || 'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm'
 const ACCESS_TOKEN_KEY = 'partionAccessToken'
 const REFRESH_TOKEN_KEY = 'partionRefreshToken'
 
@@ -116,17 +117,11 @@ async function handleResponse(response, fallback) {
 }
 
 export async function getTossClientConfig() {
-  return handleResponse(await request('/api/config'), '결제 설정을 불러오지 못했습니다.')
+  return { clientKey: TOSS_CLIENT_KEY }
 }
 
 export async function savePaymentAmount(payload) {
-  return handleResponse(
-    await request('/api/payments/save-amount', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '결제 정보를 저장하지 못했습니다.',
-  )
+  return createDepositRequest(payload)
 }
 
 export async function createDepositRequest(payload) {
@@ -140,23 +135,11 @@ export async function createDepositRequest(payload) {
 }
 
 export async function verifyPaymentAmount(payload) {
-  return handleResponse(
-    await request('/api/payments/verify-amount', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '결제 금액을 확인하지 못했습니다.',
-  )
+  return payload
 }
 
 export async function confirmPayment(payload) {
-  return handleResponse(
-    await request('/api/payments/confirm', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { auth: true }),
-    '결제를 승인하지 못했습니다.',
-  )
+  return confirmDepositPayment(payload)
 }
 
 export async function confirmDepositPayment(payload) {
