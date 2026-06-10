@@ -232,7 +232,7 @@ export async function getMyOrders({ productId, type, status, page = 0, size = 20
 export async function cancelOrder(orderId) {
   return normalizeOrder(
     await handleResponse(
-      await request(`/api/orders/${orderId}`, { method: 'DELETE' }, { auth: true }),
+      await request(`/api/orders/${orderId}/cancel`, { method: 'POST' }, { auth: true }),
       '주문을 취소하지 못했습니다.',
     ),
   )

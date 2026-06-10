@@ -136,7 +136,7 @@ export async function registerUser({ nickname, email, password }) {
     }
   }
 
-  const response = await fetch(buildApiUrl('/api/auth/register'), {
+  const response = await fetch(buildApiUrl('/api/auth/signup'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
