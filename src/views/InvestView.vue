@@ -1,10 +1,13 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { getTossClientConfig, savePaymentAmount } from '../api/payments'
 import { getProducts } from '../api/products'
+import { useAuth } from '../composables/useAuth'
 import { products as mockProducts } from '../data/products'
 import { formatHundredMillion, formatWon } from '../utils/formatters'
 
 const emit = defineEmits(['navigate'])
+const { isAuthenticated, user } = useAuth()
 
 const products = ref(mockProducts)
 const isLoadingProducts = ref(false)
@@ -12,6 +15,12 @@ const productMessage = ref('')
 const investableProducts = computed(() => products.value.filter((product) => product.open))
 const selectedSymbol = ref(mockProducts.find((product) => product.open)?.symbol || mockProducts[0]?.symbol)
 const selectedPlanIndex = ref(1)
+const widgets = ref(null)
+const isPaymentReady = ref(false)
+const isPreparingPayment = ref(false)
+const isRequestingPayment = ref(false)
+const paymentMessage = ref('')
+const customerKey = createUuid()
 
 const selectedProduct = computed(() => {
   return (
@@ -92,9 +101,124 @@ const projectedProgress = computed(() => {
   )
 })
 
-watch(selectedSymbol, () => {
-  selectedPlanIndex.value = 1
+const orderName = computed(() => {
+  if (!selectedProduct.value || !selectedPlan.value) {
+    return 'PARTION 투자 상품'
+  }
+
+  return `${selectedProduct.value.name} ${selectedPlan.value.label} ${selectedPlan.value.tokens}토큰`
 })
+
+const paymentStatusMessage = computed(() => {
+  if (paymentMessage.value) {
+    return paymentMessage.value
+  }
+
+  if (!isAuthenticated.value) {
+    return '투자를 진행하려면 먼저 로그인하세요.'
+  }
+
+  if (isPreparingPayment.value) {
+    return '결제 모듈을 준비하고 있습니다.'
+  }
+
+  return isPaymentReady.value
+    ? '결제수단과 약관 확인 후 투자 결제를 진행할 수 있습니다.'
+    : '결제 모듈을 불러오는 중입니다.'
+})
+
+function createUuid() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16)
+    const value = char === 'x' ? random : (random & 0x3) | 0x8
+    return value.toString(16)
+  })
+}
+
+function getOrderId() {
+  return `order_${createUuid().replaceAll('-', '').slice(0, 24)}`
+}
+
+function loadTossPaymentsScript() {
+  if (globalThis.TossPayments) {
+    return Promise.resolve(globalThis.TossPayments)
+  }
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.getElementById('toss-payments-sdk')
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(globalThis.TossPayments), { once: true })
+      existingScript.addEventListener('error', () => reject(new Error('Toss 결제 모듈을 불러오지 못했습니다.')), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'toss-payments-sdk'
+    script.src = 'https://js.tosspayments.com/v2/standard'
+    script.async = true
+    script.addEventListener('load', () => resolve(globalThis.TossPayments), { once: true })
+    script.addEventListener('error', () => reject(new Error('Toss 결제 모듈을 불러오지 못했습니다.')), { once: true })
+    document.head.appendChild(script)
+  })
+}
+
+async function syncTossAmount() {
+  if (!widgets.value || !selectedAmount.value) {
+    return
+  }
+
+  await widgets.value.setAmount({
+    value: selectedAmount.value,
+    currency: 'KRW',
+  })
+}
+
+async function bootstrapPayment() {
+  if (!selectedProduct.value || !selectedAmount.value) {
+    return
+  }
+
+  isPreparingPayment.value = true
+  isPaymentReady.value = false
+  paymentMessage.value = ''
+
+  try {
+    await nextTick()
+    const TossPayments = await loadTossPaymentsScript()
+    const { clientKey } = await getTossClientConfig()
+    const tossPayments = TossPayments(clientKey)
+
+    widgets.value = tossPayments.widgets({ customerKey })
+    await syncTossAmount()
+    await Promise.all([
+      widgets.value.renderPaymentMethods({
+        selector: '#payment-methods',
+        variantKey: 'DEFAULT',
+      }),
+      widgets.value.renderAgreement({
+        selector: '#agreement',
+        variantKey: 'AGREEMENT',
+      }),
+    ])
+    isPaymentReady.value = true
+  } catch (error) {
+    paymentMessage.value = error.message || '결제 모듈을 준비하지 못했습니다.'
+  } finally {
+    isPreparingPayment.value = false
+  }
+}
+
+watch(selectedSymbol, async () => {
+  selectedPlanIndex.value = 1
+  await syncTossAmount()
+})
+
+watch(selectedPlanIndex, syncTossAmount)
 
 async function loadInvestableProducts() {
   isLoadingProducts.value = true
@@ -114,7 +238,58 @@ async function loadInvestableProducts() {
   }
 }
 
-onMounted(loadInvestableProducts)
+async function handlePaymentClick() {
+  if (!isAuthenticated.value) {
+    paymentMessage.value = '로그인 후 투자 결제를 진행할 수 있습니다.'
+    emit('navigate', 'login')
+    return
+  }
+
+  if (!selectedProduct.value || !selectedProduct.value.open) {
+    paymentMessage.value = '현재 투자 가능한 상품을 선택해주세요.'
+    return
+  }
+
+  isRequestingPayment.value = true
+  paymentMessage.value = ''
+
+  try {
+    if (!widgets.value || !isPaymentReady.value) {
+      await bootstrapPayment()
+    }
+
+    if (!widgets.value) {
+      throw new Error('결제 모듈을 준비하지 못했습니다.')
+    }
+
+    const orderId = getOrderId()
+    await savePaymentAmount({
+      orderId,
+      amount: selectedAmount.value,
+      orderName: orderName.value,
+      productId: selectedProduct.value.productId,
+      quantity: selectedPlan.value.tokens,
+    })
+
+    await widgets.value.requestPayment({
+      orderId,
+      orderName: orderName.value,
+      customerName: user.value?.nickname || user.value?.name || 'PARTION 회원',
+      customerEmail: user.value?.email || 'customer@example.com',
+      successUrl: `${window.location.origin}/payment/success`,
+      failUrl: `${window.location.origin}/payment/fail`,
+    })
+  } catch (error) {
+    paymentMessage.value = error.message || '결제를 시작하지 못했습니다.'
+  } finally {
+    isRequestingPayment.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadInvestableProducts()
+  await bootstrapPayment()
+})
 </script>
 
 <template>
@@ -233,12 +408,18 @@ onMounted(loadInvestableProducts)
               <dd>{{ projectedProgress }}%</dd>
             </div>
           </dl>
-          <div class="payment-placeholder">
-            <strong>결제 모듈 준비 영역</strong>
-            <span>API 연동 전까지 화면 흐름만 확인할 수 있습니다.</span>
+          <div class="toss-widget-box" aria-label="Toss 결제 선택 영역">
+            <div id="payment-methods"></div>
+            <div id="agreement"></div>
           </div>
-          <button type="button">투자 결제하기</button>
-          <p class="message" role="status">투자를 진행하려면 먼저 로그인하세요.</p>
+          <button
+            type="button"
+            :disabled="isPreparingPayment || isRequestingPayment || !selectedProduct.open"
+            @click="handlePaymentClick"
+          >
+            {{ isRequestingPayment ? '결제 요청 중' : '투자 결제하기' }}
+          </button>
+          <p class="message" role="status">{{ paymentStatusMessage }}</p>
         </aside>
       </section>
     </section>

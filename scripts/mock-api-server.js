@@ -60,6 +60,7 @@ let nextCommentId = 3
 let nextPaymentId = 2
 let nextBlockId = 4
 const invalidatedRefreshTokens = new Set()
+const savedPaymentAmounts = new Map()
 
 const investments = [
   {
@@ -984,6 +985,13 @@ function handlePortfolio(request, response, url) {
 async function handleWalletsAndPayments(request, response, url) {
   const { pathname } = url
 
+  if (request.method === 'GET' && pathname === '/api/config') {
+    ok(response, {
+      clientKey: process.env.TOSS_CLIENT_KEY || 'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm',
+    })
+    return
+  }
+
   if (request.method === 'GET' && pathname === '/api/wallets/me') {
     ok(response, wallet)
     return
@@ -991,6 +999,104 @@ async function handleWalletsAndPayments(request, response, url) {
 
   if (request.method === 'GET' && pathname === '/api/wallets/me/transactions') {
     ok(response, paginate(walletTransactions, url))
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/payments/save-amount') {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const amount = Number(body.amount)
+    if (!body.orderId || amount <= 0) {
+      fail(response, 400, '결제 정보를 확인해주세요')
+      return
+    }
+
+    savedPaymentAmounts.set(body.orderId, {
+      orderId: body.orderId,
+      orderName: body.orderName || 'PARTION 투자 상품',
+      productId: body.productId,
+      quantity: body.quantity,
+      amount,
+      memberId: user.id,
+      requestedAt: nowIso(),
+    })
+    ok(response, { orderId: body.orderId, amount })
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/payments/verify-amount') {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const savedPayment = savedPaymentAmounts.get(body.orderId)
+    const amount = Number(body.amount)
+    if (!savedPayment || savedPayment.amount !== amount) {
+      fail(response, 400, '결제 금액이 일치하지 않습니다')
+      return
+    }
+
+    ok(response, { verified: true, orderId: body.orderId, amount })
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/payments/confirm') {
+    const user = getAuthenticatedUser(request)
+    const body = await readBody(request, response)
+    if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const savedPayment = savedPaymentAmounts.get(body.orderId)
+    const amount = Number(body.amount)
+    if (!savedPayment || savedPayment.amount !== amount) {
+      fail(response, 400, '결제 금액이 일치하지 않습니다')
+      return
+    }
+
+    const payment = {
+      id: nextPaymentId,
+      paymentKey: body.paymentKey,
+      orderId: body.orderId,
+      orderName: savedPayment.orderName,
+      productId: savedPayment.productId,
+      quantity: savedPayment.quantity,
+      amount,
+      status: 'DONE',
+      method: 'TOSS',
+      requestedAt: savedPayment.requestedAt,
+      approvedAt: nowIso(),
+    }
+    nextPaymentId += 1
+    payments.unshift(payment)
+    investments.unshift({
+      id: nextInvestmentId,
+      productId: savedPayment.productId,
+      productName: products.find((product) => product.id === Number(savedPayment.productId))?.name || savedPayment.orderName,
+      amount,
+      quantity: savedPayment.quantity,
+      status: 'COMPLETED',
+      investedAt: nowIso(),
+    })
+    nextInvestmentId += 1
+    addLedgerBlock('INVESTMENT', payment)
+    savedPaymentAmounts.delete(body.orderId)
+    ok(response, payment)
     return
   }
 
