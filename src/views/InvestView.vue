@@ -1,7 +1,12 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { getTossClientConfig, savePaymentAmount } from '../api/payments'
-import { getProducts } from '../api/products'
+import {
+  createInvestment,
+  getInvestmentProduct,
+  getInvestmentProducts,
+} from '../api/investments'
+import { createDepositRequest, getTossClientConfig } from '../api/payments'
+import { getMyWallet } from '../api/wallets'
 import { useAuth } from '../composables/useAuth'
 import { products as mockProducts } from '../data/products'
 import { formatHundredMillion, formatWon } from '../utils/formatters'
@@ -10,8 +15,11 @@ const emit = defineEmits(['navigate'])
 const { isAuthenticated, user } = useAuth()
 
 const products = ref(mockProducts)
+const wallet = ref(null)
 const isLoadingProducts = ref(false)
+const isLoadingWallet = ref(false)
 const productMessage = ref('')
+const walletMessage = ref('')
 const investableProducts = computed(() => products.value.filter((product) => product.open))
 const selectedSymbol = ref(mockProducts.find((product) => product.open)?.symbol || mockProducts[0]?.symbol)
 const selectedPlanIndex = ref(1)
@@ -21,6 +29,7 @@ const isPreparingPayment = ref(false)
 const isRequestingPayment = ref(false)
 const paymentMessage = ref('')
 const customerKey = createUuid()
+const pendingInvestmentStorageKey = 'partionPendingInvestmentOrder'
 
 const selectedProduct = computed(() => {
   return (
@@ -118,13 +127,25 @@ const paymentStatusMessage = computed(() => {
     return '투자를 진행하려면 먼저 로그인하세요.'
   }
 
+  if (isLoadingWallet.value) {
+    return '지갑 예치금 정보를 확인하고 있습니다.'
+  }
+
   if (isPreparingPayment.value) {
     return '결제 모듈을 준비하고 있습니다.'
   }
 
-  return isPaymentReady.value
-    ? '결제수단과 약관 확인 후 투자 결제를 진행할 수 있습니다.'
-    : '결제 모듈을 불러오는 중입니다.'
+  if (wallet.value && wallet.value.availableBalance >= selectedAmount.value) {
+    return '보유 예치금으로 바로 투자할 수 있습니다.'
+  }
+
+  if (wallet.value) {
+    return isPaymentReady.value
+      ? '예치금이 부족하면 Toss 충전 후 투자가 이어집니다.'
+      : '결제 모듈을 불러오는 중입니다.'
+  }
+
+  return walletMessage.value || '지갑 정보를 불러오지 못하면 Toss 결제로 진행합니다.'
 })
 
 function createUuid() {
@@ -215,6 +236,7 @@ async function bootstrapPayment() {
 
 watch(selectedSymbol, async () => {
   selectedPlanIndex.value = 1
+  await loadSelectedProductDetail(selectedProduct.value?.productId)
   await syncTossAmount()
 })
 
@@ -225,7 +247,7 @@ async function loadInvestableProducts() {
   productMessage.value = ''
 
   try {
-    const page = await getProducts({ status: 'FUNDING', page: 0, size: 20 })
+    const page = await getInvestmentProducts({ page: 0, size: 20 })
 
     if (page.content.length) {
       products.value = page.content
@@ -236,6 +258,69 @@ async function loadInvestableProducts() {
   } finally {
     isLoadingProducts.value = false
   }
+}
+
+async function loadSelectedProductDetail(productId) {
+  if (!productId) {
+    return
+  }
+
+  try {
+    const product = await getInvestmentProduct(productId)
+    if (!product) {
+      return
+    }
+
+    const index = products.value.findIndex((item) => item.productId === product.productId)
+    if (index >= 0) {
+      products.value.splice(index, 1, {
+        ...products.value[index],
+        ...product,
+      })
+    }
+  } catch (error) {
+    productMessage.value = `${error.message || '상품 상세 API를 불러오지 못했습니다.'} 필요한 값은 예시 데이터로 보강합니다.`
+  }
+}
+
+async function loadWallet() {
+  if (!isAuthenticated.value) {
+    wallet.value = null
+    walletMessage.value = ''
+    return
+  }
+
+  isLoadingWallet.value = true
+  walletMessage.value = ''
+
+  try {
+    wallet.value = await getMyWallet()
+  } catch (error) {
+    wallet.value = null
+    walletMessage.value = `${error.message || '지갑 API를 불러오지 못했습니다.'} 결제는 Toss 충전 흐름으로 진행합니다.`
+  } finally {
+    isLoadingWallet.value = false
+  }
+}
+
+function applyInvestmentResult(investment) {
+  const quantity = Number(investment?.quantity ?? selectedPlan.value?.tokens ?? 0)
+  const amount = Number(investment?.totalAmount ?? investment?.amount ?? selectedAmount.value)
+
+  if (selectedProduct.value && amount > 0) {
+    selectedProduct.value.fundedAmount = Math.min(
+      selectedProduct.value.targetAmount,
+      selectedProduct.value.fundedAmount + amount,
+    )
+    selectedProduct.value.currentAmount = selectedProduct.value.fundedAmount
+  }
+
+  if (wallet.value && amount > 0) {
+    wallet.value.availableBalance = Math.max(0, wallet.value.availableBalance - amount)
+    wallet.value.totalBalance = Math.max(0, wallet.value.totalBalance - amount)
+  }
+
+  paymentMessage.value = `${quantity}토큰 투자가 완료되었습니다.`
 }
 
 async function handlePaymentClick() {
@@ -254,22 +339,34 @@ async function handlePaymentClick() {
   paymentMessage.value = ''
 
   try {
+    if (wallet.value?.availableBalance >= selectedAmount.value) {
+      const investment = await createInvestment({
+        productId: selectedProduct.value.productId,
+        quantity: selectedPlan.value.tokens,
+      })
+      applyInvestmentResult(investment)
+      return
+    }
+
     if (!widgets.value || !isPaymentReady.value) {
       await bootstrapPayment()
     }
-
     if (!widgets.value) {
       throw new Error('결제 모듈을 준비하지 못했습니다.')
     }
 
-    const orderId = getOrderId()
-    await savePaymentAmount({
+    const deposit = await createDepositRequest({
+      amount: selectedAmount.value,
+    })
+    const orderId = deposit.orderId || getOrderId()
+
+    globalThis.sessionStorage.setItem(pendingInvestmentStorageKey, JSON.stringify({
       orderId,
       amount: selectedAmount.value,
-      orderName: orderName.value,
       productId: selectedProduct.value.productId,
       quantity: selectedPlan.value.tokens,
-    })
+      orderName: orderName.value,
+    }))
 
     await widgets.value.requestPayment({
       orderId,
@@ -288,6 +385,8 @@ async function handlePaymentClick() {
 
 onMounted(async () => {
   await loadInvestableProducts()
+  await loadWallet()
+  await loadSelectedProductDetail(selectedProduct.value?.productId)
   await bootstrapPayment()
 })
 </script>
@@ -406,6 +505,10 @@ onMounted(async () => {
             <div>
               <dt>예상 달성률</dt>
               <dd>{{ projectedProgress }}%</dd>
+            </div>
+            <div v-if="isAuthenticated">
+              <dt>사용 가능 예치금</dt>
+              <dd>{{ wallet ? formatWon(wallet.availableBalance) : '-' }}</dd>
             </div>
           </dl>
           <div class="toss-widget-box" aria-label="Toss 결제 선택 영역">
