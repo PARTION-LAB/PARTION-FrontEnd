@@ -1230,6 +1230,13 @@ button {
   background: var(--ink);
 }
 
+.cash-form button:disabled,
+.market-toolbar button:disabled,
+.trade-form > button:disabled {
+  cursor: not-allowed;
+  background: #9ca3af;
+}
+
 .market-toolbar {
   display: flex;
   align-items: end;
@@ -1284,6 +1291,26 @@ button {
   background: var(--surface-soft);
   color: #333d4b;
   font-size: 14px;
+}
+
+.trade-row.has-action {
+  grid-template-columns: 0.72fr 1fr 1fr auto;
+}
+
+.trade-row-action {
+  min-height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.trade-row-action:disabled {
+  cursor: not-allowed;
+  color: var(--subtle);
 }
 
 .book-row.is-bid,
@@ -2410,6 +2437,20 @@ button {
 
   .market-toolbar {
     display: grid;
+  }
+
+  .trade-row.has-action {
+    grid-template-columns: 1fr auto;
+  }
+
+  .trade-row.has-action strong,
+  .trade-row.has-action span:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .trade-row.has-action .trade-row-action {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .checkout-media {
