@@ -86,10 +86,13 @@ const investments = [
 const orders = [
   {
     id: 1,
+    memberId: 1,
     productId: 7,
     productName: products[6]?.name,
     side: 'BUY',
+    type: 'BUY',
     orderType: 'LIMIT',
+    orderMethod: 'LIMIT',
     price: 10100,
     quantity: 12,
     filledQuantity: 4,
@@ -99,10 +102,13 @@ const orders = [
   },
   {
     id: 2,
+    memberId: 1,
     productId: 8,
     productName: products[7]?.name,
     side: 'SELL',
+    type: 'SELL',
     orderType: 'LIMIT',
+    orderMethod: 'LIMIT',
     price: 8200,
     quantity: 5,
     filledQuantity: 5,
@@ -339,6 +345,35 @@ function paginate(items, url) {
 
 function findProduct(id) {
   return products.find((product) => product.id === Number(id) || product.productId === Number(id))
+}
+
+function decorateTradingProduct(product, index = 0) {
+  const premiumRates = [1.032, 0.986, 1.074, 1.018, 0.957, 1.089]
+  const lastTradePrice = Math.round(product.unitPrice * premiumRates[index % premiumRates.length])
+  const changeRate = Number((((lastTradePrice - product.unitPrice) / product.unitPrice) * 100).toFixed(2))
+
+  return {
+    ...product,
+    lastTradePrice,
+    changeRate,
+  }
+}
+
+function normalizeOrderResponse(order) {
+  const type = order.type || order.side || 'BUY'
+  const orderMethod = order.orderMethod || order.orderType || 'LIMIT'
+  const status = order.status === 'CANCELLED' ? 'CANCELED' : order.status
+
+  return {
+    ...order,
+    orderId: order.id,
+    type,
+    side: type,
+    orderMethod,
+    orderType: orderMethod,
+    status,
+    createdTrades: order.createdTrades || [],
+  }
 }
 
 function createToken(user) {
@@ -885,14 +920,35 @@ async function handleInvestments(request, response, url) {
 async function handleOrdersAndTrades(request, response, url) {
   const { pathname } = url
 
-  if (request.method === 'GET' && (pathname === '/api/market/products' || pathname === '/api/trading-products')) {
-    ok(response, paginate(products.filter((product) => !product.open || product.status === 'TRADING'), url))
+  if (
+    request.method === 'GET' &&
+    (pathname === '/api/market/products' || pathname === '/api/trading-products' || pathname === '/api/trading/products')
+  ) {
+    const category = url.searchParams.get('category')
+    const keyword = url.searchParams.get('keyword')?.trim().toLowerCase()
+    let filtered = products.filter((product) => !product.open || product.status === 'TRADING')
+
+    if (category) {
+      filtered = filtered.filter((product) => product.category === category)
+    }
+
+    if (keyword) {
+      filtered = filtered.filter((product) => product.name.toLowerCase().includes(keyword))
+    }
+
+    ok(response, paginate(filtered.map(decorateTradingProduct), url))
     return
   }
 
   if (request.method === 'POST' && pathname === '/api/orders') {
+    const user = getAuthenticatedUser(request)
     const body = await readBody(request, response)
     if (!body) return
+
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
 
     const product = findProduct(body.productId)
     if (!product) {
@@ -900,37 +956,119 @@ async function handleOrdersAndTrades(request, response, url) {
       return
     }
 
+    if (product.status !== 'TRADING' && product.open) {
+      fail(response, 409, '거래할 수 없는 상품입니다')
+      return
+    }
+
+    const type = String(body.type || body.side || 'BUY').toUpperCase()
+    const orderMethod = String(body.orderMethod || body.orderType || 'LIMIT').toUpperCase()
     const quantity = Number(body.quantity)
     const price = Number(body.price || product.unitPrice)
 
-    if (quantity <= 0 || price <= 0) {
+    if (!['BUY', 'SELL'].includes(type) || !['LIMIT', 'MARKET'].includes(orderMethod) || quantity <= 0 || price <= 0) {
       fail(response, 400, '주문 정보를 확인해주세요')
       return
     }
 
+    if (type === 'BUY') {
+      const orderAmount = price * quantity
+
+      if (wallet.availableBalance < orderAmount) {
+        fail(response, 409, '예치금 잔액이 부족합니다')
+        return
+      }
+
+      wallet.availableBalance -= orderAmount
+      wallet.lockedBalance += orderAmount
+    }
+
     const order = {
       id: nextOrderId,
+      memberId: user.id,
       productId: product.id,
       productName: product.name,
-      side: body.side || 'BUY',
-      orderType: body.orderType || 'LIMIT',
+      side: type,
+      type,
+      orderType: orderMethod,
+      orderMethod,
       price,
       quantity,
       filledQuantity: 0,
       remainingQuantity: quantity,
       status: 'OPEN',
+      createdTrades: [],
       createdAt: nowIso(),
     }
     nextOrderId += 1
     orders.unshift(order)
-    ok(response, order, 201)
+    ok(response, normalizeOrderResponse(order), 201)
     return
   }
 
   if (request.method === 'GET' && pathname === '/api/orders/me') {
+    const user = getAuthenticatedUser(request)
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const productId = url.searchParams.get('productId')
+    const type = url.searchParams.get('type')
     const status = url.searchParams.get('status')
-    const filtered = status ? orders.filter((order) => order.status === status) : orders
-    ok(response, paginate(filtered, url))
+    let filtered = orders.filter((order) => !order.memberId || order.memberId === user.id)
+
+    if (productId) {
+      filtered = filtered.filter((order) => order.productId === Number(productId))
+    }
+
+    if (type) {
+      filtered = filtered.filter((order) => (order.type || order.side) === type)
+    }
+
+    if (status) {
+      filtered = filtered.filter((order) => normalizeOrderResponse(order).status === status)
+    }
+
+    ok(response, paginate(filtered.map(normalizeOrderResponse), url))
+    return
+  }
+
+  if (request.method === 'DELETE' && /^\/api\/orders\/\d+$/.test(pathname)) {
+    const user = getAuthenticatedUser(request)
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    const order = orders.find((item) => item.id === Number(pathname.split('/')[3]))
+    if (!order) {
+      fail(response, 404, '주문을 찾을 수 없습니다')
+      return
+    }
+
+    if (order.memberId && order.memberId !== user.id) {
+      fail(response, 403, '주문 취소 권한이 없습니다')
+      return
+    }
+
+    if (!['OPEN', 'PARTIALLY_FILLED'].includes(order.status)) {
+      fail(response, 409, '취소할 수 없는 주문입니다')
+      return
+    }
+
+    if ((order.type || order.side) === 'BUY') {
+      const unlockAmount = order.price * order.remainingQuantity
+      wallet.lockedBalance = Math.max(0, wallet.lockedBalance - unlockAmount)
+      wallet.availableBalance += unlockAmount
+    }
+
+    order.status = 'CANCELED'
+    order.cancelledAt = nowIso()
+    ok(response, {
+      orderId: order.id,
+      status: order.status,
+    })
     return
   }
 
@@ -944,14 +1082,14 @@ async function handleOrdersAndTrades(request, response, url) {
       return
     }
 
-    if (order.status !== 'OPEN') {
+    if (!['OPEN', 'PARTIALLY_FILLED'].includes(order.status)) {
       fail(response, 409, '취소할 수 없는 주문입니다')
       return
     }
 
-    order.status = 'CANCELLED'
+    order.status = 'CANCELED'
     order.cancelledAt = nowIso()
-    ok(response, order)
+    ok(response, normalizeOrderResponse(order))
     return
   }
 
@@ -995,10 +1133,53 @@ function handlePortfolio(request, response, url) {
     return
   }
 
+  if (request.method === 'GET' && pathname === '/api/portfolio/holdings') {
+    const user = getAuthenticatedUser(request)
+    if (!user) {
+      fail(response, 401, '로그인이 필요합니다')
+      return
+    }
+
+    ok(response, paginate([
+      {
+        productId: 1,
+        productName: products[0]?.name,
+        category: products[0]?.category,
+        quantity: 18,
+        lockedQuantity: 2,
+        availableQuantity: 16,
+        averagePrice: products[0]?.unitPrice,
+        currentPrice: 5160,
+      },
+      {
+        productId: 7,
+        productName: products[6]?.name,
+        category: products[6]?.category,
+        quantity: 44,
+        lockedQuantity: 0,
+        availableQuantity: 44,
+        averagePrice: products[6]?.unitPrice,
+        currentPrice: 10400,
+      },
+      {
+        productId: 8,
+        productName: products[7]?.name,
+        category: products[7]?.category,
+        quantity: 11,
+        lockedQuantity: 1,
+        availableQuantity: 10,
+        averagePrice: products[7]?.unitPrice,
+        currentPrice: 8120,
+      },
+    ], url))
+    return
+  }
+
   if (request.method === 'GET' && pathname === '/api/portfolio/summary') {
     ok(response, {
       totalAssetAmount: 4520800,
       cashBalance: wallet.availableBalance,
+      lockedCashBalance: wallet.lockedBalance,
       investmentAmount: 1320800,
       profitLoss: 70800,
       profitRate: 5.66,
