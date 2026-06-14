@@ -78,7 +78,6 @@ describe('ProfileView', () => {
 
   it('reissues access token and retries loading my profile when token is expired', async () => {
     localStorage.setItem('partionAccessToken', 'expired-access-token')
-    localStorage.setItem('partionRefreshToken', 'mock-refresh-token')
 
     const fetchMock = vi
       .fn()
@@ -96,14 +95,9 @@ describe('ProfileView', () => {
         ok: true,
         text: () =>
           Promise.resolve(JSON.stringify({
-            success: true,
-            response: {
-              accessToken: 'new-access-token',
-              refreshToken: 'new-refresh-token',
-              tokenType: 'Bearer',
-              expiresIn: 1800,
-            },
-            error: null,
+            accessToken: 'new-access-token',
+            tokenType: 'Bearer',
+            expiresIn: 1800,
           })),
       })
       .mockResolvedValueOnce({
@@ -132,14 +126,12 @@ describe('ProfileView', () => {
     expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/auth\/reissue$/)
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
       method: 'POST',
-      body: JSON.stringify({
-        refreshToken: 'mock-refresh-token',
-      }),
+      credentials: 'include',
     })
     expect(fetchMock.mock.calls[2][0]).toMatch(/\/api\/members\/me$/)
     expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer new-access-token')
     expect(localStorage.getItem('partionAccessToken')).toBe('new-access-token')
-    expect(localStorage.getItem('partionRefreshToken')).toBe('new-refresh-token')
+    expect(localStorage.getItem('partionRefreshToken')).toBeNull()
     expect(wrapper.get('input[autocomplete="email"]').element.value).toBe('user123@example.com')
   })
 

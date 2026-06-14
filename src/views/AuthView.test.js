@@ -14,23 +14,18 @@ describe('AuthView', () => {
     vi.unstubAllGlobals()
   })
 
-  it('submits login data to the login API and stores tokens', async () => {
+  it('submits login data to the login API and stores the access token', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
         Promise.resolve(JSON.stringify({
-          success: true,
-          response: {
-            accessToken: 'mock-access-token',
-            refreshToken: 'mock-refresh-token',
-            tokenType: 'Bearer',
-            expiresIn: 1800,
-            member: {
-              email: 'user123@example.com',
-              nickname: 'user123',
-            },
+          accessToken: 'mock-access-token',
+          tokenType: 'Bearer',
+          expiresIn: 1800,
+          member: {
+            email: 'user123@example.com',
+            nickname: 'user123',
           },
-          error: null,
         })),
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -46,6 +41,7 @@ describe('AuthView', () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/login$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -55,7 +51,7 @@ describe('AuthView', () => {
       }),
     })
     expect(localStorage.getItem('partionAccessToken')).toBe('mock-access-token')
-    expect(localStorage.getItem('partionRefreshToken')).toBe('mock-refresh-token')
+    expect(localStorage.getItem('partionRefreshToken')).toBeNull()
     expect(JSON.parse(localStorage.getItem('partionMember'))).toEqual({
       email: 'user123@example.com',
       nickname: 'user123',

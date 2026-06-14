@@ -1,7 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true'
 const ACCESS_TOKEN_KEY = 'partionAccessToken'
-const REFRESH_TOKEN_KEY = 'partionRefreshToken'
 
 function buildApiUrl(path) {
   return `${API_BASE_URL}${path}`
@@ -64,10 +63,6 @@ function getStoredAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY)
 }
 
-function getStoredRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY)
-}
-
 function getAuthHeaders() {
   const headers = {
     'Content-Type': 'application/json',
@@ -102,6 +97,7 @@ export async function loginUser({ email, password }) {
 
   const response = await fetch(buildApiUrl('/api/auth/login'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -172,10 +168,8 @@ export async function logoutUser() {
 
   const response = await fetch(buildApiUrl('/api/auth/logout'), {
     method: 'POST',
+    credentials: 'include',
     headers: getAuthHeaders(),
-    body: JSON.stringify({
-      refreshToken: getStoredRefreshToken(),
-    }),
   })
 
   const data = await parseResponse(response)
@@ -187,13 +181,7 @@ export async function logoutUser() {
   return data
 }
 
-export async function reissueAccessToken(refreshToken = getStoredRefreshToken()) {
-  if (!refreshToken) {
-    const error = new Error('refresh token이 없습니다.')
-    error.status = 401
-    throw error
-  }
-
+export async function reissueAccessToken() {
   if (USE_MOCK_API) {
     await new Promise((resolve) => {
       setTimeout(resolve, 200)
@@ -203,7 +191,7 @@ export async function reissueAccessToken(refreshToken = getStoredRefreshToken())
       success: true,
       response: {
         accessToken: 'mock-access-token-reissued',
-        refreshToken,
+        refreshToken: 'mock-refresh-token-reissued',
         tokenType: 'Bearer',
         expiresIn: 1800,
       },
@@ -213,12 +201,10 @@ export async function reissueAccessToken(refreshToken = getStoredRefreshToken())
 
   const response = await fetch(buildApiUrl('/api/auth/reissue'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      refreshToken,
-    }),
   })
 
   const data = await parseResponse(response)

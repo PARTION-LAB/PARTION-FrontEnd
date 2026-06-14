@@ -7,9 +7,8 @@ describe('auth API', () => {
     vi.unstubAllGlobals()
   })
 
-  it('calls logout API with access token and refresh token', async () => {
+  it('calls logout API with access token and cookie credentials', async () => {
     localStorage.setItem('partionAccessToken', 'mock-access-token')
-    localStorage.setItem('partionRefreshToken', 'mock-refresh-token')
 
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -22,31 +21,22 @@ describe('auth API', () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/logout$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: 'Bearer mock-access-token',
       },
-      body: JSON.stringify({
-        refreshToken: 'mock-refresh-token',
-      }),
     })
   })
 
-  it('calls reissue API with refresh token', async () => {
-    localStorage.setItem('partionRefreshToken', 'mock-refresh-token')
-
+  it('calls reissue API with cookie credentials', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
         Promise.resolve(JSON.stringify({
-          success: true,
-          response: {
-            accessToken: 'mock-access-token-reissued',
-            refreshToken: 'mock-refresh-token-reissued',
-            tokenType: 'Bearer',
-            expiresIn: 1800,
-          },
-          error: null,
+          accessToken: 'mock-access-token-reissued',
+          tokenType: 'Bearer',
+          expiresIn: 1800,
         })),
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -56,13 +46,12 @@ describe('auth API', () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/reissue$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        refreshToken: 'mock-refresh-token',
-      }),
     })
-    expect(result.response.accessToken).toBe('mock-access-token-reissued')
+    expect(result.accessToken).toBe('mock-access-token-reissued')
   })
+
 })
