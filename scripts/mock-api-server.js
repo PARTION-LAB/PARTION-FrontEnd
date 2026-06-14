@@ -1214,7 +1214,7 @@ async function handleWalletsAndPayments(request, response, url) {
 
   if (request.method === 'GET' && pathname === '/api/config') {
     ok(response, {
-      clientKey: process.env.TOSS_CLIENT_KEY || 'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm',
+      clientKey: process.env.TOSS_CLIENT_KEY || '',
     })
     return
   }

@@ -1,7 +1,7 @@
 import { reissueAccessToken } from './auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
-const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY || 'test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm'
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY || ''
 const ACCESS_TOKEN_KEY = 'partionAccessToken'
 const REFRESH_TOKEN_KEY = 'partionRefreshToken'
 
@@ -117,6 +117,10 @@ async function handleResponse(response, fallback) {
 }
 
 export async function getTossClientConfig() {
+  if (!TOSS_CLIENT_KEY) {
+    throw new Error('Toss 클라이언트 키가 설정되지 않았습니다.')
+  }
+
   return { clientKey: TOSS_CLIENT_KEY }
 }
 
