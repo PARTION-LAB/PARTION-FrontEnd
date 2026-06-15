@@ -1,15 +1,22 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { createDepositRequest } from '../api/payments'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { createDepositRequest, getTossClientConfig } from '../api/payments'
 import { getPortfolioHoldings, getPortfolioSummary } from '../api/portfolio'
-import { cancelOrder, createOrder, getMyOrders, getTradingProducts } from '../api/trading'
+import {
+  cancelOrder,
+  createOrder,
+  getMyOrders,
+  getOrderBook,
+  getRecentTrades,
+  getTradingProducts,
+} from '../api/trading'
 import { getMyWallet } from '../api/wallets'
 import { useAuth } from '../composables/useAuth'
 import { products as mockProducts } from '../data/products'
 import { formatWon } from '../utils/formatters'
 
 const emit = defineEmits(['navigate'])
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, user } = useAuth()
 
 const mockTradableProducts = mockProducts.filter((product) => !product.open)
 const apiProducts = ref(mockTradableProducts)
@@ -17,10 +24,15 @@ const portfolioHoldings = ref([])
 const portfolioSummary = ref(null)
 const wallet = ref(null)
 const myOrders = ref([])
+const orderBook = ref({ asks: [], bids: [] })
+const recentTrades = ref([])
 const isLoadingProducts = ref(false)
+const isLoadingMarketData = ref(false)
 const isLoadingAccount = ref(false)
 const isSubmittingOrder = ref(false)
 const isRequestingDeposit = ref(false)
+const isPreparingPayment = ref(false)
+const isPaymentReady = ref(false)
 const cancellingOrderId = ref(null)
 const selectedSymbol = ref(mockTradableProducts[0]?.symbol || mockProducts[0]?.symbol)
 const selectedSide = ref('buy')
@@ -28,6 +40,10 @@ const selectedOrderType = ref('limit')
 const orderPrice = ref(0)
 const orderQuantity = ref(1)
 const depositAmount = ref(100000)
+const productKeyword = ref('')
+const productSearchMessage = ref('')
+const widgets = ref(null)
+const customerKey = createUuid()
 const tradeMessage = ref('로그인하지 않아도 호가창과 최근 체결은 확인할 수 있습니다.')
 
 const tradableProducts = computed(() => {
@@ -66,23 +82,6 @@ const marketPrice = computed(() => {
   return Math.round(
     selectedProduct.value.unitPrice * premiumRates[productIndex % premiumRates.length],
   )
-})
-
-const orderBook = computed(() => {
-  const base = marketPrice.value || selectedProduct.value?.unitPrice || 0
-
-  return {
-    asks: [3, 2, 1].map((step) => ({
-      price: base + step * 120,
-      quantity: step * 8 + 7,
-      orders: step + 1,
-    })),
-    bids: [0, 1, 2].map((step) => ({
-      price: base - step * 110,
-      quantity: step * 10 + 11,
-      orders: step + 2,
-    })),
-  }
 })
 
 const holdings = computed(() => {
@@ -161,17 +160,6 @@ const tokenValue = computed(() => {
   )
 })
 
-const recentTrades = computed(() => {
-  const sides = ['buy', 'sell', 'buy', 'buy', 'sell', 'sell']
-
-  return sides.map((side, index) => ({
-    side,
-    symbol: selectedProduct.value?.symbol || '',
-    price: marketPrice.value + (side === 'buy' ? index * 20 : -index * 18),
-    quantity: [3, 7, 2, 12, 5, 9][index],
-  }))
-})
-
 const reports = computed(() => {
   if (myOrders.value.length) {
     return myOrders.value.map((order) => ({
@@ -215,6 +203,115 @@ const orderTotal = computed(() => {
   return Number(price || 0) * Number(orderQuantity.value || 0)
 })
 
+const depositOrderName = computed(() => {
+  return `PARTION 예치금 충전 ${formatWon(depositAmount.value || 0)}`
+})
+
+const depositStatusMessage = computed(() => {
+  if (!isAuthenticated.value) {
+    return '로그인 후 현금 충전을 진행할 수 있습니다.'
+  }
+
+  if (isPreparingPayment.value) {
+    return 'Toss 결제창을 준비하고 있습니다.'
+  }
+
+  if (isPaymentReady.value) {
+    return '결제 수단을 선택한 뒤 현금 충전을 진행하세요.'
+  }
+
+  return '결제 모듈을 불러오는 중입니다.'
+})
+
+function createUuid() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16)
+    const value = char === 'x' ? random : (random & 0x3) | 0x8
+    return value.toString(16)
+  })
+}
+
+function getOrderId() {
+  return `order_${createUuid().replaceAll('-', '').slice(0, 24)}`
+}
+
+function loadTossPaymentsScript() {
+  if (globalThis.TossPayments) {
+    return Promise.resolve(globalThis.TossPayments)
+  }
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.getElementById('toss-payments-sdk')
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(globalThis.TossPayments), { once: true })
+      existingScript.addEventListener('error', () => reject(new Error('Toss 결제 모듈을 불러오지 못했습니다.')), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'toss-payments-sdk'
+    script.src = 'https://js.tosspayments.com/v2/standard'
+    script.async = true
+    script.addEventListener('load', () => resolve(globalThis.TossPayments), { once: true })
+    script.addEventListener('error', () => reject(new Error('Toss 결제 모듈을 불러오지 못했습니다.')), { once: true })
+    document.head.appendChild(script)
+  })
+}
+
+async function syncDepositTossAmount() {
+  const amount = Number(depositAmount.value || 0)
+
+  if (!widgets.value || amount <= 0) {
+    return
+  }
+
+  await widgets.value.setAmount({
+    value: amount,
+    currency: 'KRW',
+  })
+}
+
+async function bootstrapDepositPayment() {
+  const amount = Number(depositAmount.value || 0)
+
+  if (amount < 1000) {
+    return
+  }
+
+  isPreparingPayment.value = true
+  isPaymentReady.value = false
+
+  try {
+    await nextTick()
+    const TossPayments = await loadTossPaymentsScript()
+    const { clientKey } = await getTossClientConfig()
+    const tossPayments = TossPayments(clientKey)
+
+    widgets.value = tossPayments.widgets({ customerKey })
+    await syncDepositTossAmount()
+    await Promise.all([
+      widgets.value.renderPaymentMethods({
+        selector: '#market-payment-methods',
+        variantKey: 'DEFAULT',
+      }),
+      widgets.value.renderAgreement({
+        selector: '#market-agreement',
+        variantKey: 'AGREEMENT',
+      }),
+    ])
+    isPaymentReady.value = true
+  } catch (error) {
+    tradeMessage.value = error.message || 'Toss 결제창을 준비하지 못했습니다.'
+  } finally {
+    isPreparingPayment.value = false
+  }
+}
+
 function getOrderStatusLabel(status) {
   const labels = {
     OPEN: '대기',
@@ -231,11 +328,12 @@ function syncOrderPrice() {
   orderPrice.value = marketPrice.value
 }
 
-async function loadTradingProducts() {
+async function loadTradingProducts({ keyword = '' } = {}) {
   isLoadingProducts.value = true
+  productSearchMessage.value = ''
 
   try {
-    const page = await getTradingProducts({ page: 0, size: 20 })
+    const page = await getTradingProducts({ keyword, page: 0, size: 20 })
 
     if (page.content.length) {
       apiProducts.value = page.content
@@ -243,13 +341,26 @@ async function loadTradingProducts() {
       if (!page.content.some((product) => product.symbol === selectedSymbol.value)) {
         selectedSymbol.value = page.content[0]?.symbol
       }
+    } else if (keyword) {
+      productSearchMessage.value = '검색 결과가 없습니다.'
     }
   } catch (error) {
-    apiProducts.value = mockTradableProducts
+    if (!keyword) {
+      apiProducts.value = mockTradableProducts
+    }
     tradeMessage.value = `${error.message || '거래 상품 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
   } finally {
     isLoadingProducts.value = false
   }
+}
+
+async function searchTradingProducts() {
+  await loadTradingProducts({ keyword: productKeyword.value.trim() })
+}
+
+async function clearProductSearch() {
+  productKeyword.value = ''
+  await loadTradingProducts()
 }
 
 async function loadAccount() {
@@ -306,9 +417,42 @@ async function loadOrders() {
   }
 }
 
+async function loadMarketData() {
+  const productId = selectedProduct.value?.productId
+
+  if (!productId) {
+    orderBook.value = { asks: [], bids: [] }
+    recentTrades.value = []
+    return
+  }
+
+  isLoadingMarketData.value = true
+
+  const [orderBookResult, tradesResult] = await Promise.allSettled([
+    getOrderBook(productId, { depth: 10 }),
+    getRecentTrades(productId, { size: 20 }),
+  ])
+
+  if (orderBookResult.status === 'fulfilled') {
+    orderBook.value = orderBookResult.value
+  } else {
+    orderBook.value = { asks: [], bids: [] }
+    tradeMessage.value = orderBookResult.reason?.message || '호가창을 불러오지 못했습니다.'
+  }
+
+  if (tradesResult.status === 'fulfilled') {
+    recentTrades.value = tradesResult.value
+  } else {
+    recentTrades.value = []
+    tradeMessage.value = tradesResult.reason?.message || '최근 체결을 불러오지 못했습니다.'
+  }
+
+  isLoadingMarketData.value = false
+}
+
 async function refreshMarket() {
   await loadTradingProducts()
-  await Promise.all([loadAccount(), loadOrders()])
+  await Promise.all([loadAccount(), loadOrders(), loadMarketData()])
   syncOrderPrice()
 }
 
@@ -329,14 +473,26 @@ async function submitCashDeposit() {
   isRequestingDeposit.value = true
 
   try {
-    const deposit = await createDepositRequest({ amount })
-    tradeMessage.value = `${formatWon(amount)} 충전 요청이 생성되었습니다.`
-
-    if (deposit?.orderId) {
-      tradeMessage.value = `${tradeMessage.value} 주문번호 ${deposit.orderId}`
+    if (!widgets.value || !isPaymentReady.value) {
+      await bootstrapDepositPayment()
     }
+    if (!widgets.value) {
+      throw new Error('Toss 결제창을 준비하지 못했습니다.')
+    }
+
+    const deposit = await createDepositRequest({ amount })
+    const orderId = deposit?.orderId || getOrderId()
+
+    await widgets.value.requestPayment({
+      orderId,
+      orderName: depositOrderName.value,
+      customerName: user.value?.nickname || user.value?.name || 'PARTION 회원',
+      customerEmail: user.value?.email || 'customer@example.com',
+      successUrl: `${window.location.origin}/payment/success`,
+      failUrl: `${window.location.origin}/payment/fail`,
+    })
   } catch (error) {
-    tradeMessage.value = error.message || '충전 요청을 생성하지 못했습니다.'
+    tradeMessage.value = error.message || 'Toss 결제를 시작하지 못했습니다.'
   } finally {
     isRequestingDeposit.value = false
   }
@@ -385,7 +541,7 @@ async function submitOrder() {
       remainingQuantity: order.remainingQuantity || quantity,
     })
     tradeMessage.value = `${selectedProduct.value.name} ${sideLabel} ${quantity}토큰 ${typeLabel} 주문이 접수되었습니다.`
-    await Promise.all([loadAccount(), loadOrders()])
+    await Promise.all([loadAccount(), loadOrders(), loadMarketData()])
   } catch (error) {
     tradeMessage.value = error.message || '주문을 제출하지 못했습니다.'
   } finally {
@@ -412,7 +568,7 @@ async function handleCancelOrder(orderId) {
     }
 
     tradeMessage.value = `#${orderId} 주문이 취소되었습니다.`
-    await Promise.all([loadAccount(), loadOrders()])
+    await Promise.all([loadAccount(), loadOrders(), loadMarketData()])
   } catch (error) {
     tradeMessage.value = error.message || '주문을 취소하지 못했습니다.'
   } finally {
@@ -420,13 +576,21 @@ async function handleCancelOrder(orderId) {
   }
 }
 
-watch(selectedProduct, syncOrderPrice, { immediate: true })
+watch(selectedProduct, async () => {
+  syncOrderPrice()
+  await loadMarketData()
+}, { immediate: true })
+
+watch(depositAmount, syncDepositTossAmount)
 
 watch(isAuthenticated, async () => {
   await Promise.all([loadAccount(), loadOrders()])
 })
 
-onMounted(refreshMarket)
+onMounted(async () => {
+  await refreshMarket()
+  await bootstrapDepositPayment()
+})
 </script>
 
 <template>
@@ -517,9 +681,14 @@ onMounted(refreshMarket)
                 type="number"
               />
             </label>
+            <div class="toss-widget-box market-payment-box" aria-label="Toss 결제 선택 영역">
+              <div id="market-payment-methods"></div>
+              <div id="market-agreement"></div>
+            </div>
             <button type="submit" :disabled="isRequestingDeposit">
-              {{ isRequestingDeposit ? '충전 요청 중' : '현금 충전' }}
+              {{ isRequestingDeposit ? '결제 요청 중' : '현금 충전' }}
             </button>
+            <p class="message" role="status">{{ depositStatusMessage }}</p>
           </form>
 
           <h3>내 보유 토큰</h3>
@@ -542,21 +711,44 @@ onMounted(refreshMarket)
         </aside>
 
         <section class="market-board">
-          <div class="market-toolbar">
-            <label>
-              거래 종목
-              <select v-model="selectedSymbol">
-                <option
-                  v-for="product in tradableProducts"
-                  :key="product.symbol"
-                  :value="product.symbol"
-                >
-                  {{ product.name }}
-                </option>
-              </select>
-            </label>
+          <div class="market-toolbar product-search-toolbar">
+            <form class="product-search-form" @submit.prevent="searchTradingProducts">
+              <label>
+                거래 종목 검색
+                <input
+                  v-model.trim="productKeyword"
+                  placeholder="상품명 또는 카테고리 검색"
+                  type="search"
+                />
+              </label>
+              <button type="submit" :disabled="isLoadingProducts">
+                {{ isLoadingProducts ? '검색 중' : '검색' }}
+              </button>
+              <button type="button" class="secondary-action" :disabled="isLoadingProducts" @click="clearProductSearch">
+                초기화
+              </button>
+            </form>
             <button type="button" :disabled="isLoadingProducts || isLoadingAccount" @click="refreshMarket">
               새로고침
+            </button>
+          </div>
+
+          <div class="product-search-results" aria-label="거래 가능 상품 검색 결과">
+            <p v-if="isLoadingProducts" class="message">거래 가능 상품을 불러오는 중입니다.</p>
+            <p v-else-if="productSearchMessage" class="message">{{ productSearchMessage }}</p>
+            <button
+              v-for="product in tradableProducts"
+              :key="product.symbol"
+              class="product-result"
+              :class="{ 'is-selected': selectedProduct?.symbol === product.symbol }"
+              type="button"
+              @click="selectedSymbol = product.symbol"
+            >
+              <span>
+                <strong>{{ product.name }}</strong>
+                <small>{{ product.category }} · {{ product.statusLabel || product.status }}</small>
+              </span>
+              <em>{{ formatWon(product.lastTradePrice || product.currentPrice || product.unitPrice) }}</em>
             </button>
           </div>
 
@@ -569,6 +761,18 @@ onMounted(refreshMarket)
                 <span>주문</span>
               </div>
               <div class="order-book">
+                <p
+                  v-if="isLoadingMarketData"
+                  class="message market-empty-message"
+                >
+                  호가창을 불러오는 중입니다.
+                </p>
+                <p
+                  v-else-if="!orderBook.asks.length && !orderBook.bids.length"
+                  class="message market-empty-message"
+                >
+                  현재 대기 중인 주문이 없습니다.
+                </p>
                 <div
                   v-for="ask in orderBook.asks"
                   :key="`ask-${ask.price}`"
@@ -655,6 +859,18 @@ onMounted(refreshMarket)
             <div>
               <h3>최근 체결</h3>
               <div class="trade-list">
+                <p
+                  v-if="isLoadingMarketData"
+                  class="message market-empty-message"
+                >
+                  최근 체결을 불러오는 중입니다.
+                </p>
+                <p
+                  v-else-if="!recentTrades.length"
+                  class="message market-empty-message"
+                >
+                  아직 체결된 거래가 없습니다.
+                </p>
                 <div
                   v-for="trade in recentTrades"
                   :key="`${trade.side}-${trade.price}-${trade.quantity}`"

@@ -1203,6 +1203,7 @@ button {
 }
 
 .cash-form input,
+.product-search-form input,
 .market-toolbar select,
 .trade-form input {
   width: 100%;
@@ -1215,6 +1216,7 @@ button {
 }
 
 .cash-form button,
+.product-search-form button,
 .market-toolbar button,
 .trade-form > button {
   min-height: 44px;
@@ -1231,10 +1233,20 @@ button {
 }
 
 .cash-form button:disabled,
+.product-search-form button:disabled,
 .market-toolbar button:disabled,
 .trade-form > button:disabled {
   cursor: not-allowed;
   background: #9ca3af;
+}
+
+.market-payment-box {
+  margin: 4px 0 2px;
+}
+
+.market-payment-box > div {
+  min-height: 72px;
+  padding: 10px;
 }
 
 .market-toolbar {
@@ -1247,6 +1259,81 @@ button {
 
 .market-toolbar label {
   min-width: min(100%, 360px);
+}
+
+.product-search-toolbar {
+  align-items: stretch;
+}
+
+.product-search-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+  width: min(100%, 620px);
+}
+
+.product-search-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.product-search-form .secondary-action {
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.product-search-results {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.product-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px 14px;
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.product-result.is-selected {
+  border-color: rgba(0, 100, 255, 0.55);
+  background: #f7fbff;
+  box-shadow: 0 0 0 3px rgba(0, 100, 255, 0.08);
+}
+
+.product-result span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.product-result strong,
+.product-result small {
+  overflow-wrap: anywhere;
+}
+
+.product-result small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.product-result em {
+  color: var(--blue);
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .market-grid {
@@ -1281,6 +1368,13 @@ button {
 .trade-list {
   display: grid;
   gap: 6px;
+}
+
+.market-empty-message {
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
 }
 
 .book-row,
@@ -2437,6 +2531,15 @@ button {
 
   .market-toolbar {
     display: grid;
+  }
+
+  .product-search-form {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .product-result {
+    grid-template-columns: 1fr;
   }
 
   .trade-row.has-action {
