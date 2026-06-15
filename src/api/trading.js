@@ -192,6 +192,59 @@ export async function getTradingProducts({ category, keyword, page = 0, size = 2
   }
 }
 
+function normalizeOrderBookLevel(level) {
+  if (!level) {
+    return null
+  }
+
+  return {
+    price: Number(level.price ?? 0),
+    quantity: Number(level.quantity ?? 0),
+    orders: Number(level.orders ?? 0),
+  }
+}
+
+export async function getOrderBook(productId, { depth = 10 } = {}) {
+  const data = await handleResponse(
+    await request(appendQuery(`/api/products/${productId}/orderbook`, { depth })),
+    '호가창을 불러오지 못했습니다.',
+  )
+
+  return {
+    productId: data?.productId ?? productId,
+    asks: Array.isArray(data?.asks) ? data.asks.map(normalizeOrderBookLevel).filter(Boolean) : [],
+    bids: Array.isArray(data?.bids) ? data.bids.map(normalizeOrderBookLevel).filter(Boolean) : [],
+  }
+}
+
+export function normalizeTrade(trade) {
+  if (!trade) {
+    return null
+  }
+
+  return {
+    ...trade,
+    id: trade.tradeId ?? trade.id,
+    tradeId: trade.tradeId ?? trade.id,
+    productId: trade.productId,
+    symbol: trade.symbol || trade.productName || `PRODUCT-${trade.productId}`,
+    side: trade.side === 'SELL' ? 'sell' : 'buy',
+    price: Number(trade.price ?? 0),
+    quantity: Number(trade.quantity ?? 0),
+    tradedAt: trade.tradedAt,
+  }
+}
+
+export async function getRecentTrades(productId, { size = 20 } = {}) {
+  const data = await handleResponse(
+    await request(appendQuery(`/api/products/${productId}/trades/recent`, { limit: size })),
+    '최근 체결을 불러오지 못했습니다.',
+  )
+  const content = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
+
+  return content.map(normalizeTrade).filter(Boolean)
+}
+
 export async function createOrder({ productId, type, orderMethod, price, quantity }) {
   return normalizeOrder(
     await handleResponse(
