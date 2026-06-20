@@ -204,6 +204,10 @@ function normalizeOrderBookLevel(level) {
   }
 }
 
+function sortOrderBookLevelsByHighPrice(levels) {
+  return [...levels].sort((left, right) => right.price - left.price)
+}
+
 export async function getOrderBook(productId, { depth = 10 } = {}) {
   const data = await handleResponse(
     await request(appendQuery(`/api/products/${productId}/orderbook`, { depth })),
@@ -212,8 +216,12 @@ export async function getOrderBook(productId, { depth = 10 } = {}) {
 
   return {
     productId: data?.productId ?? productId,
-    asks: Array.isArray(data?.asks) ? data.asks.map(normalizeOrderBookLevel).filter(Boolean) : [],
-    bids: Array.isArray(data?.bids) ? data.bids.map(normalizeOrderBookLevel).filter(Boolean) : [],
+    asks: Array.isArray(data?.asks)
+      ? sortOrderBookLevelsByHighPrice(data.asks.map(normalizeOrderBookLevel).filter(Boolean))
+      : [],
+    bids: Array.isArray(data?.bids)
+      ? sortOrderBookLevelsByHighPrice(data.bids.map(normalizeOrderBookLevel).filter(Boolean))
+      : [],
   }
 }
 

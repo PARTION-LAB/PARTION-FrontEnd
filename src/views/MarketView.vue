@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createDepositRequest, getTossClientConfig } from '../api/payments'
 import { getPortfolioHoldings, getPortfolioSummary } from '../api/portfolio'
 import {
@@ -45,6 +45,10 @@ const productSearchMessage = ref('')
 const widgets = ref(null)
 const customerKey = createUuid()
 const tradeMessage = ref('로그인하지 않아도 호가창과 최근 체결은 확인할 수 있습니다.')
+const MARKET_DATA_REFRESH_INTERVAL_MS = 1000
+const ORDER_SETTLEMENT_REFRESH_DELAYS_MS = [250, 500, 1000, 2000, 3500]
+let marketDataRefreshTimer = null
+let isAutoRefreshingMarketData = false
 
 const tradableProducts = computed(() => {
   const products = apiProducts.value.filter((product) => !product.open || product.status === 'TRADING')
@@ -417,7 +421,13 @@ async function loadOrders() {
   }
 }
 
-async function loadMarketData() {
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+async function loadMarketData({ silent = false } = {}) {
   const productId = selectedProduct.value?.productId
 
   if (!productId) {
@@ -426,7 +436,9 @@ async function loadMarketData() {
     return
   }
 
-  isLoadingMarketData.value = true
+  if (!silent) {
+    isLoadingMarketData.value = true
+  }
 
   const [orderBookResult, tradesResult] = await Promise.allSettled([
     getOrderBook(productId, { depth: 10 }),
@@ -447,13 +459,65 @@ async function loadMarketData() {
     tradeMessage.value = tradesResult.reason?.message || '최근 체결을 불러오지 못했습니다.'
   }
 
-  isLoadingMarketData.value = false
+  if (!silent) {
+    isLoadingMarketData.value = false
+  }
 }
 
 async function refreshMarket() {
   await loadTradingProducts()
   await Promise.all([loadAccount(), loadOrders(), loadMarketData()])
   syncOrderPrice()
+}
+
+async function refreshLiveMarketData({ silent = true, includeAccount = true } = {}) {
+  const refreshes = [loadMarketData({ silent })]
+
+  if (includeAccount) {
+    refreshes.push(loadAccount(), loadOrders())
+  }
+
+  await Promise.all(refreshes)
+}
+
+async function refreshAfterOrderSettlement() {
+  for (const delay of ORDER_SETTLEMENT_REFRESH_DELAYS_MS) {
+    await wait(delay)
+    await refreshLiveMarketData()
+  }
+}
+
+async function autoRefreshMarketData() {
+  if (isAutoRefreshingMarketData) {
+    return
+  }
+
+  isAutoRefreshingMarketData = true
+
+  try {
+    await refreshLiveMarketData({ includeAccount: false })
+  } finally {
+    isAutoRefreshingMarketData = false
+  }
+}
+
+function startMarketDataAutoRefresh() {
+  if (marketDataRefreshTimer) {
+    return
+  }
+
+  marketDataRefreshTimer = window.setInterval(() => {
+    void autoRefreshMarketData()
+  }, MARKET_DATA_REFRESH_INTERVAL_MS)
+}
+
+function stopMarketDataAutoRefresh() {
+  if (!marketDataRefreshTimer) {
+    return
+  }
+
+  window.clearInterval(marketDataRefreshTimer)
+  marketDataRefreshTimer = null
 }
 
 async function submitCashDeposit() {
@@ -541,7 +605,8 @@ async function submitOrder() {
       remainingQuantity: order.remainingQuantity || quantity,
     })
     tradeMessage.value = `${selectedProduct.value.name} ${sideLabel} ${quantity}토큰 ${typeLabel} 주문이 접수되었습니다.`
-    await Promise.all([loadAccount(), loadOrders(), loadMarketData()])
+    await refreshLiveMarketData({ silent: false })
+    void refreshAfterOrderSettlement()
   } catch (error) {
     tradeMessage.value = error.message || '주문을 제출하지 못했습니다.'
   } finally {
@@ -590,6 +655,11 @@ watch(isAuthenticated, async () => {
 onMounted(async () => {
   await refreshMarket()
   await bootstrapDepositPayment()
+  startMarketDataAutoRefresh()
+})
+
+onUnmounted(() => {
+  stopMarketDataAutoRefresh()
 })
 </script>
 

@@ -1,84 +1,31 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { products } from '../data/products'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { getLedgerBlocks, getLedgerTransactions, verifyLedger } from '../api/ledger'
 import { formatWon } from '../utils/formatters'
 
 const refreshedAt = ref(new Date())
+const blocks = ref([])
+const ledgerEvents = ref([])
+const ledgerStatus = ref(null)
+const ledgerMessage = ref('')
+const isLoading = ref(false)
+let ledgerRefreshTimer = null
+const LEDGER_REFRESH_INTERVAL_MS = 1000
 
-const ledgerEvents = computed(() => {
-  return products.flatMap((product, index) => {
-    const baseTime = Date.parse('2026-06-08T09:00:00+09:00') + index * 1000 * 60 * 37
-    const tokenized = {
-      id: `${product.symbol}-tokenized`,
-      type: 'ASSET_TOKENIZED',
-      symbol: product.symbol,
-      asset: product.category,
-      quantity: Math.round(product.targetAmount / product.unitPrice),
-      amount: product.targetAmount,
-      occurredAt: new Date(baseTime).toISOString(),
-    }
-
-    const funded = {
-      id: `${product.symbol}-funded`,
-      type: product.open ? 'SUBSCRIPTION_PAYMENT' : 'SECONDARY_TRADE',
-      symbol: product.symbol,
-      asset: product.category,
-      quantity: Math.round(product.fundedAmount / product.unitPrice),
-      amount: product.fundedAmount,
-      occurredAt: new Date(baseTime + 1000 * 60 * 12).toISOString(),
-    }
-
-    return [tokenized, funded]
-  })
-})
-
-const blocks = computed(() => {
-  const grouped = []
-  for (let index = 0; index < ledgerEvents.value.length; index += 3) {
-    grouped.push(ledgerEvents.value.slice(index, index + 3))
-  }
-
-  return grouped.map((events, index) => {
-    const previousHash =
-      index === 0
-        ? '0000000000000000000000000000000000000000000000000000000000000000'
-        : pseudoHash(`partion-prev-${index - 1}`)
-    const merkleRoot = pseudoHash(events.map((event) => event.id).join('|'))
-    const hash = pseudoHash(`${index}-${previousHash}-${merkleRoot}`)
-
-    return {
-      index,
-      hash,
-      previousHash,
-      merkleRoot,
-      nonce: 4200 + index * 137,
-      events,
-    }
-  })
-})
-
-const recentBlocks = computed(() => blocks.value.slice(-8).reverse())
-const recentEvents = computed(() => ledgerEvents.value.slice(-12).reverse())
-const latestHash = computed(() => blocks.value.at(-1)?.hash || '')
-const eventCounts = computed(() => countBy(ledgerEvents.value, 'type'))
-const assetCounts = computed(() => countBy(ledgerEvents.value, 'asset'))
+const recentBlocks = computed(() => blocks.value.slice(0, 8))
+const recentEvents = computed(() => ledgerEvents.value.slice(0, 12))
+const latestHash = computed(() => ledgerStatus.value?.latestHash || recentBlocks.value[0]?.currentHash || '')
+const isLedgerValid = computed(() => ledgerStatus.value?.valid ?? true)
+const eventCounts = computed(() => countBy(ledgerEvents.value, 'eventType'))
+const assetCounts = computed(() => countBy(ledgerEvents.value, 'productCategory'))
+const latestHeight = computed(() => ledgerStatus.value?.height ?? recentBlocks.value[0]?.blockNumber ?? 0)
 
 function countBy(items, key) {
   return items.reduce((counts, item) => {
-    counts[item[key]] = (counts[item[key]] || 0) + 1
+    const name = item[key] || '기타'
+    counts[name] = (counts[name] || 0) + 1
     return counts
   }, {})
-}
-
-function pseudoHash(seed) {
-  let hash = 0
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash << 5) - hash + seed.charCodeAt(index)
-    hash |= 0
-  }
-
-  const base = Math.abs(hash).toString(16).padStart(8, '0')
-  return `${base}${base.split('').reverse().join('')}${base}${base}`.slice(0, 64)
 }
 
 function shortHash(hash) {
@@ -86,15 +33,71 @@ function shortHash(hash) {
 }
 
 function formatDate(value) {
+  const date = new Date(value)
+
+  if (!value || Number.isNaN(date.getTime())) {
+    return '-'
+  }
+
   return new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(value))
+  }).format(date)
 }
 
-function refreshLedger() {
-  refreshedAt.value = new Date()
+async function refreshLedger({ silent = false } = {}) {
+  if (isLoading.value) {
+    return
+  }
+
+  isLoading.value = true
+  if (!silent) {
+    ledgerMessage.value = ''
+  }
+
+  try {
+    const [blockPage, transactionPage, verifyResult] = await Promise.all([
+      getLedgerBlocks({ page: 0, size: 20 }),
+      getLedgerTransactions({ page: 0, size: 50 }),
+      verifyLedger(),
+    ])
+
+    blocks.value = blockPage.content
+    ledgerEvents.value = transactionPage.content
+    ledgerStatus.value = verifyResult
+    refreshedAt.value = new Date()
+  } catch (error) {
+    ledgerMessage.value = error.message || '원장 정보를 불러오지 못했습니다.'
+  } finally {
+    isLoading.value = false
+  }
 }
+
+function startLedgerAutoRefresh() {
+  if (ledgerRefreshTimer) {
+    return
+  }
+
+  ledgerRefreshTimer = window.setInterval(() => {
+    void refreshLedger({ silent: true })
+  }, LEDGER_REFRESH_INTERVAL_MS)
+}
+
+function stopLedgerAutoRefresh() {
+  if (!ledgerRefreshTimer) {
+    return
+  }
+
+  window.clearInterval(ledgerRefreshTimer)
+  ledgerRefreshTimer = null
+}
+
+onMounted(async () => {
+  await refreshLedger()
+  startLedgerAutoRefresh()
+})
+
+onUnmounted(stopLedgerAutoRefresh)
 </script>
 
 <template>
@@ -108,8 +111,13 @@ function refreshLedger() {
           현재 원장의 무결성과 최신 이벤트를 확인합니다.
         </p>
       </div>
-      <button class="primary-link page-action-link" type="button" @click="refreshLedger">
-        원장 새로고침
+      <button
+        class="primary-link page-action-link"
+        type="button"
+        :disabled="isLoading"
+        @click="refreshLedger"
+      >
+        {{ isLoading ? '불러오는 중' : '원장 새로고침' }}
       </button>
     </section>
 
@@ -127,14 +135,16 @@ function refreshLedger() {
         </article>
         <article class="chain-metric">
           <span>Integrity</span>
-          <strong class="is-valid">VALID</strong>
+          <strong :class="{ 'is-valid': isLedgerValid, 'is-invalid': !isLedgerValid }">
+            {{ isLedgerValid ? 'VALID' : 'CHECK' }}
+          </strong>
           <small>{{ shortHash(latestHash) }}</small>
         </article>
       </div>
 
       <div class="ledger-state">
-        공개 원장 흐름을 보고 있습니다. 마지막 갱신:
-        {{ formatDate(refreshedAt.toISOString()) }}
+        {{ ledgerMessage || ledgerStatus?.message || '공개 원장 흐름을 보고 있습니다.' }}
+        마지막 갱신: {{ formatDate(refreshedAt.toISOString()) }}
       </div>
 
       <section class="chain-panel ledger-flow">
@@ -143,12 +153,12 @@ function refreshLedger() {
             <p class="eyebrow">Latest Blocks</p>
             <h2>최근 블록 흐름</h2>
           </div>
-          <span class="ledger-pill">height {{ Math.max(0, blocks.length - 1) }}</span>
+          <span class="ledger-pill">height {{ latestHeight.toLocaleString('ko-KR') }}</span>
         </div>
         <div class="chain-node-map">
-          <article v-for="block in recentBlocks" :key="block.hash" class="chain-node">
-            <span>#{{ block.index }}</span>
-            <strong>{{ shortHash(block.hash) }}</strong>
+          <article v-for="block in recentBlocks" :key="block.currentHash" class="chain-node">
+            <span>#{{ block.blockNumber }}</span>
+            <strong>{{ shortHash(block.currentHash) }}</strong>
             <dl>
               <div>
                 <dt>prev</dt>
@@ -159,14 +169,18 @@ function refreshLedger() {
                 <dd>{{ shortHash(block.merkleRoot) }}</dd>
               </div>
               <div>
-                <dt>nonce</dt>
-                <dd>{{ block.nonce }}</dd>
+                <dt>time</dt>
+                <dd>{{ formatDate(block.createdAt) }}</dd>
               </div>
               <div>
                 <dt>events</dt>
-                <dd>{{ block.events.length }}</dd>
+                <dd>{{ block.eventCount }}</dd>
               </div>
             </dl>
+          </article>
+          <article v-if="!recentBlocks.length" class="chain-node">
+            <span>#-</span>
+            <strong>아직 생성된 블록이 없습니다.</strong>
           </article>
         </div>
       </section>
@@ -180,14 +194,23 @@ function refreshLedger() {
             </div>
           </div>
           <div class="chain-list">
-            <div v-for="event in recentEvents" :key="event.id" class="chain-row event-row">
-              <span>{{ event.type }} · {{ event.symbol }}</span>
-              <strong>{{ shortHash(pseudoHash(event.id)) }}</strong>
+            <div
+              v-for="event in recentEvents"
+              :key="event.transactionHash || event.id"
+              class="chain-row event-row"
+            >
+              <span>{{ event.eventType }} · {{ event.productName }}</span>
+              <strong>{{ shortHash(event.transactionHash) }}</strong>
               <small>
                 {{ formatDate(event.occurredAt) }} ·
                 {{ event.quantity.toLocaleString('ko-KR') }} token ·
                 {{ formatWon(event.amount) }}
               </small>
+            </div>
+            <div v-if="!recentEvents.length" class="chain-row event-row">
+              <span>NO_EVENTS</span>
+              <strong>체결 원장 이벤트가 아직 없습니다.</strong>
+              <small>매칭엔진에서 체결이 발생하면 이곳에 기록됩니다.</small>
             </div>
           </div>
         </section>

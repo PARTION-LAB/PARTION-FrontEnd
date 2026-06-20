@@ -61,6 +61,8 @@ let nextPaymentId = 2
 let nextBlockId = 4
 const invalidatedRefreshTokens = new Set()
 const savedPaymentAmounts = new Map()
+const emailVerificationCodes = new Map()
+const emailVerificationVerifiedUntil = new Map()
 
 const investments = [
   {
@@ -450,6 +452,10 @@ function validateRegisterRequest({ nickname, email, password }) {
   return ''
 }
 
+function emailVerificationKey(email, purpose) {
+  return `${String(purpose || '').toUpperCase()}:${String(email || '').trim()}`
+}
+
 function categoryNameFromCode(category) {
   if (category === 'REAL_ESTATE') return '부동산'
   if (category === 'ART') return '미술품'
@@ -474,6 +480,70 @@ function addLedgerBlock(eventType, payload) {
 async function handleAuth(request, response, url) {
   const { pathname } = url
 
+  if (request.method === 'POST' && pathname === '/api/auth/email/send') {
+    const body = await readBody(request, response)
+    if (!body) return
+
+    const email = String(body.email || '').trim()
+    const purpose = String(body.purpose || '').toUpperCase()
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fail(response, 400, '올바른 이메일 형식으로 입력해주세요.')
+      return
+    }
+
+    if (!['SIGNUP', 'PASSWORD_RESET'].includes(purpose)) {
+      fail(response, 400, '인증 목적을 확인해주세요.')
+      return
+    }
+
+    if (purpose === 'SIGNUP' && users.has(email)) {
+      fail(response, 409, '이미 존재하는 이메일입니다')
+      return
+    }
+
+    emailVerificationCodes.set(emailVerificationKey(email, purpose), {
+      code: '123456',
+      expiresAt: Date.now() + 300_000,
+    })
+    ok(response, {
+      email,
+      purpose,
+      expiresIn: 300,
+    })
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/auth/email/verify') {
+    const body = await readBody(request, response)
+    if (!body) return
+
+    const email = String(body.email || '').trim()
+    const purpose = String(body.purpose || '').toUpperCase()
+    const code = String(body.code || '').trim()
+    const key = emailVerificationKey(email, purpose)
+    const verification = emailVerificationCodes.get(key)
+
+    if (!verification || verification.expiresAt < Date.now()) {
+      fail(response, 400, '인증번호가 만료되었습니다')
+      return
+    }
+
+    if (verification.code !== code) {
+      fail(response, 400, '인증번호가 일치하지 않습니다')
+      return
+    }
+
+    emailVerificationVerifiedUntil.set(key, Date.now() + 1_800_000)
+    ok(response, {
+      email,
+      purpose,
+      verified: true,
+      expiresIn: 1800,
+    })
+    return
+  }
+
   if (request.method === 'POST' && pathname === '/api/auth/signup') {
     const body = await readBody(request, response)
     if (!body) return
@@ -487,6 +557,12 @@ async function handleAuth(request, response, url) {
 
     const nickname = body.nickname.trim()
     const email = body.email.trim()
+    const verifiedUntil = emailVerificationVerifiedUntil.get(emailVerificationKey(email, 'SIGNUP')) || 0
+
+    if (verifiedUntil < Date.now()) {
+      fail(response, 400, '이메일 인증을 완료해주세요')
+      return
+    }
 
     if (users.has(email)) {
       fail(response, 409, '이미 존재하는 이메일입니다')

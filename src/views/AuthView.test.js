@@ -76,7 +76,23 @@ describe('AuthView', () => {
     expect(wrapper.text()).toContain('닉네임은 2자 이상 10자 이하로 입력해주세요.')
   })
 
-  it('submits signup data to the signup API', async () => {
+  it('requires email verification before signup', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(AuthView)
+
+    await wrapper.find('.auth-tabs button:nth-child(2)').trigger('click')
+    await wrapper.get('input[autocomplete="nickname"]').setValue('user123')
+    await wrapper.get('input[autocomplete="email"]').setValue('user123@example.com')
+    await wrapper.get('input[autocomplete="new-password"]').setValue('securePassword123!')
+    await wrapper.get('.auth-form').trigger('submit')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('이메일 인증번호 확인을 완료해주세요.')
+  })
+
+  it('sends and verifies email before submitting signup data', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve(JSON.stringify({ success: true, response: null, error: null })),
@@ -88,13 +104,43 @@ describe('AuthView', () => {
     await wrapper.find('.auth-tabs button:nth-child(2)').trigger('click')
     await wrapper.get('input[autocomplete="nickname"]').setValue('user123')
     await wrapper.get('input[autocomplete="email"]').setValue('user123@example.com')
+    await wrapper.get('.verification-send-button').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.get('input[autocomplete="one-time-code"]').setValue('123456')
+    await wrapper.get('.verification-check-button').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
     await wrapper.get('input[autocomplete="new-password"]').setValue('securePassword123!')
     await wrapper.get('.auth-form').trigger('submit')
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/signup$/)
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/email\/send$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: 'user123@example.com',
+        purpose: 'SIGNUP',
+      }),
+    })
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/auth\/email\/verify$/)
+    expect(fetchMock.mock.calls[1][1]).toEqual({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: 'user123@example.com',
+        purpose: 'SIGNUP',
+        code: '123456',
+      }),
+    })
+    expect(fetchMock.mock.calls[2][0]).toMatch(/\/api\/auth\/signup$/)
+    expect(fetchMock.mock.calls[2][1]).toEqual({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
