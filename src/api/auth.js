@@ -153,6 +153,82 @@ export async function registerUser({ nickname, email, password }) {
   return data
 }
 
+export async function sendEmailVerificationCode({ email, purpose = 'SIGNUP' }) {
+  if (USE_MOCK_API) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 300)
+    })
+
+    if (!email) {
+      throw new Error('이메일을 입력해주세요.')
+    }
+
+    return {
+      email,
+      purpose,
+      expiresIn: 300,
+    }
+  }
+
+  const response = await fetch(buildApiUrl('/api/auth/email/send'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      purpose,
+    }),
+  })
+
+  const data = await parseResponse(response)
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, '인증번호 발송에 실패했습니다.'))
+  }
+
+  return data
+}
+
+export async function verifyEmailCode({ email, code, purpose = 'SIGNUP' }) {
+  if (USE_MOCK_API) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 300)
+    })
+
+    if (!/^\d{6}$/.test(code)) {
+      throw new Error('인증번호 6자리를 입력해주세요.')
+    }
+
+    return {
+      email,
+      purpose,
+      verified: true,
+      expiresIn: 1800,
+    }
+  }
+
+  const response = await fetch(buildApiUrl('/api/auth/email/verify'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      purpose,
+      code,
+    }),
+  })
+
+  const data = await parseResponse(response)
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, '인증번호 확인에 실패했습니다.'))
+  }
+
+  return data
+}
+
 export async function logoutUser() {
   if (USE_MOCK_API) {
     await new Promise((resolve) => {

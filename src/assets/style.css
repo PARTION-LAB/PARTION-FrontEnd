@@ -558,6 +558,57 @@ button {
   color: var(--ink);
 }
 
+.verification-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #edf0f2;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.verification-actions,
+.verification-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.verification-send-button,
+.verification-check-button {
+  min-height: 42px;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--blue);
+  font-weight: 900;
+}
+
+.verification-check-button {
+  min-width: 74px;
+  padding: 0 14px;
+  background: var(--blue);
+  color: #ffffff;
+}
+
+.verification-send-button:disabled,
+.verification-check-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.verification-status {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.verification-status.success {
+  color: var(--green);
+}
+
 .auth-form > button {
   min-height: 50px;
   border: 0;
@@ -2008,6 +2059,10 @@ button {
 
 .chain-metric strong.is-valid {
   color: #0b7a55;
+}
+
+.chain-metric strong.is-invalid {
+  color: #d9480f;
 }
 
 .ledger-state {
