@@ -9,6 +9,7 @@ import LedgerView from '../views/LedgerView.vue'
 import MarketView from '../views/MarketView.vue'
 import PaymentFailView from '../views/PaymentFailView.vue'
 import PaymentSuccessView from '../views/PaymentSuccessView.vue'
+import PasswordResetView from '../views/PasswordResetView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import RegisterProductView from '../views/RegisterProductView.vue'
@@ -95,6 +96,12 @@ const routes = [
     path: '/signup',
     name: 'signup',
     component: AuthView,
+    meta: { navKey: 'auth' },
+  },
+  {
+    path: '/password-reset',
+    name: 'password-reset',
+    component: PasswordResetView,
     meta: { navKey: 'auth' },
   },
   {

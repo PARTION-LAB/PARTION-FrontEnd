@@ -4,8 +4,7 @@ import { useRoute } from 'vue-router'
 import {
   loginUser,
   registerUser,
-  sendEmailVerificationCode,
-  verifyEmailCode,
+  sendEmailVerificationLink,
 } from '../api/auth'
 import { useAuth } from '../composables/useAuth'
 
@@ -17,12 +16,10 @@ const authMode = ref('login')
 const nickname = ref('')
 const email = ref('')
 const password = ref('')
-const verificationCode = ref('')
 const verificationSentTo = ref('')
 const isEmailVerified = ref(false)
 const isSubmitting = ref(false)
 const isSendingVerification = ref(false)
-const isVerifyingCode = ref(false)
 const authMessage = ref('')
 const authMessageType = ref('info')
 
@@ -30,11 +27,6 @@ const isLogin = computed(() => authMode.value === 'login')
 const title = computed(() => (isLogin.value ? '로그인하고 투자를 이어가세요' : '회원가입하고 투자를 시작하세요'))
 const submitLabel = computed(() => (isLogin.value ? '로그인' : '회원가입'))
 const trimmedEmail = computed(() => email.value.trim())
-const canVerifyCode = computed(() => {
-  return Boolean(verificationSentTo.value)
-    && verificationSentTo.value === trimmedEmail.value
-    && verificationCode.value.trim().length === 6
-})
 
 function setAuthMode(mode) {
   authMode.value = mode
@@ -53,13 +45,37 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => route.query,
+  (query) => {
+    if (route.name !== 'signup') {
+      return
+    }
+
+    if (query.emailVerified === 'true' && typeof query.email === 'string') {
+      email.value = query.email
+      verificationSentTo.value = query.email
+      isEmailVerified.value = true
+      setMessage('이메일 인증이 완료되었습니다. 회원가입을 계속해주세요.', 'success')
+      return
+    }
+
+    if (query.emailVerified === 'false') {
+      resetEmailVerification()
+      setMessage(
+        query.reason === 'expired'
+          ? '인증 링크가 만료되었습니다. 인증 메일을 다시 발송해주세요.'
+          : '이메일 인증에 실패했습니다. 인증 메일을 다시 발송해주세요.',
+        'error',
+      )
+    }
+  },
+  { immediate: true },
+)
+
 watch(trimmedEmail, (nextEmail) => {
   if (isEmailVerified.value && nextEmail !== verificationSentTo.value) {
     isEmailVerified.value = false
-  }
-
-  if (verificationSentTo.value && nextEmail !== verificationSentTo.value) {
-    verificationCode.value = ''
   }
 })
 
@@ -69,7 +85,6 @@ function setMessage(message, type = 'info') {
 }
 
 function resetEmailVerification() {
-  verificationCode.value = ''
   verificationSentTo.value = ''
   isEmailVerified.value = false
 }
@@ -90,7 +105,7 @@ function validateSignupForm() {
   }
 
   if (!isEmailVerified.value || verificationSentTo.value !== trimmedEmail.value) {
-    return '이메일 인증번호 확인을 완료해주세요.'
+    return '이메일 인증을 완료해주세요.'
   }
 
   if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d\s]).{8,20}$/.test(password.value)) {
@@ -122,68 +137,18 @@ async function handleSendVerification() {
   setMessage('')
 
   try {
-    const data = await sendEmailVerificationCode({
+    await sendEmailVerificationLink({
       email: trimmedEmail.value,
       purpose: 'SIGNUP',
     })
-    const debugCode = data?.debugCode ?? data?.response?.debugCode
 
     verificationSentTo.value = trimmedEmail.value
-    verificationCode.value = debugCode || ''
     isEmailVerified.value = false
-    setMessage(
-      debugCode
-        ? `메일 서버가 연결되지 않아 테스트 인증번호 ${debugCode}을 사용합니다.`
-        : '인증번호를 발송했습니다. 메일함을 확인해주세요.',
-      'success',
-    )
+    setMessage('인증 메일을 발송했습니다. 메일의 인증 버튼을 눌러주세요.', 'success')
   } catch (error) {
-    setMessage(error.message || '인증번호 발송에 실패했습니다.', 'error')
+    setMessage(error.message || '인증 메일 발송에 실패했습니다.', 'error')
   } finally {
     isSendingVerification.value = false
-  }
-}
-
-async function handleVerifyCode() {
-  const code = verificationCode.value.trim()
-
-  if (!verificationSentTo.value) {
-    setMessage('먼저 인증번호를 발송해주세요.', 'error')
-    return
-  }
-
-  if (verificationSentTo.value !== trimmedEmail.value) {
-    setMessage('이메일이 변경되었습니다. 인증번호를 다시 발송해주세요.', 'error')
-    return
-  }
-
-  if (!/^\d{6}$/.test(code)) {
-    setMessage('인증번호 6자리를 입력해주세요.', 'error')
-    return
-  }
-
-  isVerifyingCode.value = true
-  setMessage('')
-
-  try {
-    const data = await verifyEmailCode({
-      email: trimmedEmail.value,
-      purpose: 'SIGNUP',
-      code,
-    })
-    const verified = data?.verified ?? data?.response?.verified
-
-    if (verified === false) {
-      throw new Error('인증번호가 일치하지 않습니다.')
-    }
-
-    isEmailVerified.value = true
-    setMessage('이메일 인증이 완료되었습니다.', 'success')
-  } catch (error) {
-    isEmailVerified.value = false
-    setMessage(error.message || '인증번호 확인에 실패했습니다.', 'error')
-  } finally {
-    isVerifyingCode.value = false
   }
 }
 
@@ -300,7 +265,7 @@ async function handleSubmit() {
               :disabled="isSendingVerification || isSubmitting"
               @click="handleSendVerification"
             >
-              {{ isSendingVerification ? '발송 중...' : verificationSentTo && verificationSentTo === trimmedEmail ? '인증번호 재발송' : '인증번호 발송' }}
+              {{ isSendingVerification ? '발송 중...' : verificationSentTo && verificationSentTo === trimmedEmail ? '인증 메일 재발송' : '인증 메일 발송' }}
             </button>
             <span
               v-if="isEmailVerified"
@@ -316,26 +281,12 @@ async function handleSubmit() {
             </span>
           </div>
           <label>
-            <span>인증번호</span>
-            <div class="verification-code-row">
-              <input
-                v-model="verificationCode"
-                type="text"
-                inputmode="numeric"
-                autocomplete="one-time-code"
-                maxlength="6"
-                placeholder="6자리 입력"
-                :disabled="!verificationSentTo || verificationSentTo !== trimmedEmail || isEmailVerified"
-              />
-              <button
-                type="button"
-                class="verification-check-button"
-                :disabled="!canVerifyCode || isVerifyingCode || isEmailVerified"
-                @click="handleVerifyCode"
-              >
-                {{ isVerifyingCode ? '확인 중...' : '확인' }}
-              </button>
-            </div>
+            <span>인증 상태</span>
+            <input
+              type="text"
+              :value="isEmailVerified ? '인증 완료' : verificationSentTo && verificationSentTo === trimmedEmail ? '메일의 인증 버튼을 눌러주세요' : '인증 메일 발송 전'"
+              disabled
+            />
           </label>
         </div>
         <label>
@@ -363,6 +314,9 @@ async function handleSubmit() {
       </form>
 
       <div class="social-login">
+        <button v-if="isLogin" type="button" @click="emit('navigate', 'password-reset')">
+          비밀번호를 잊으셨나요?
+        </button>
         <p>소셜 계정으로 계속하기</p>
         <button type="button"><span class="google">G</span>Google 로그인</button>
         <button type="button"><span class="kakao">K</span>Kakao 로그인</button>

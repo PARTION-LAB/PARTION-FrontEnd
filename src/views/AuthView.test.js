@@ -2,14 +2,21 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AuthView from './AuthView.vue'
 
+let mockRoute = {
+  name: 'login',
+  query: {},
+}
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({
-    name: 'login',
-  }),
+  useRoute: () => mockRoute,
 }))
 
 describe('AuthView', () => {
   afterEach(() => {
+    mockRoute = {
+      name: 'login',
+      query: {},
+    }
     localStorage.clear()
     vi.unstubAllGlobals()
   })
@@ -89,10 +96,10 @@ describe('AuthView', () => {
     await wrapper.get('.auth-form').trigger('submit')
 
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('이메일 인증번호 확인을 완료해주세요.')
+    expect(wrapper.text()).toContain('이메일 인증을 완료해주세요.')
   })
 
-  it('sends and verifies email before submitting signup data', async () => {
+  it('sends email verification link for signup', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve(JSON.stringify({ success: true, response: null, error: null })),
@@ -107,14 +114,6 @@ describe('AuthView', () => {
     await wrapper.get('.verification-send-button').trigger('click')
     await Promise.resolve()
     await Promise.resolve()
-    await wrapper.get('input[autocomplete="one-time-code"]').setValue('123456')
-    await wrapper.get('.verification-check-button').trigger('click')
-    await Promise.resolve()
-    await Promise.resolve()
-    await wrapper.get('input[autocomplete="new-password"]').setValue('securePassword123!')
-    await wrapper.get('.auth-form').trigger('submit')
-    await Promise.resolve()
-    await Promise.resolve()
 
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/email\/send$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
@@ -127,20 +126,33 @@ describe('AuthView', () => {
         purpose: 'SIGNUP',
       }),
     })
-    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/auth\/email\/verify$/)
-    expect(fetchMock.mock.calls[1][1]).toEqual({
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    expect(wrapper.text()).toContain('인증 메일을 발송했습니다.')
+  })
+
+  it('submits signup data after email verification redirect', async () => {
+    mockRoute = {
+      name: 'signup',
+      query: {
+        emailVerified: 'true',
         email: 'user123@example.com',
-        purpose: 'SIGNUP',
-        code: '123456',
-      }),
+      },
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ success: true, response: null, error: null })),
     })
-    expect(fetchMock.mock.calls[2][0]).toMatch(/\/api\/auth\/signup$/)
-    expect(fetchMock.mock.calls[2][1]).toEqual({
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(AuthView)
+
+    await wrapper.get('input[autocomplete="nickname"]').setValue('user123')
+    await wrapper.get('input[autocomplete="new-password"]').setValue('securePassword123!')
+    await wrapper.get('.auth-form').trigger('submit')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/signup$/)
+    expect(fetchMock.mock.calls[0][1]).toEqual({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
