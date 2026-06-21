@@ -41,7 +41,7 @@ export function useAuth() {
     const response = unwrapAuthResponse(data)
 
     if (!response.accessToken) {
-      return
+      throw new Error('로그인 응답에서 인증 토큰을 확인하지 못했습니다.')
     }
 
     localStorage.setItem(ACCESS_TOKEN_KEY, response.accessToken)
