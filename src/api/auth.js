@@ -40,6 +40,10 @@ function getErrorMessage(data, fallback) {
   return fallback
 }
 
+function getResponseData(data) {
+  return data?.response || data
+}
+
 function createMockLoginResponse(email) {
   return {
     success: true,
@@ -111,6 +115,12 @@ export async function loginUser({ email, password }) {
 
   if (!response.ok) {
     throw new Error(getErrorMessage(data, '로그인에 실패했습니다.'))
+  }
+
+  const loginData = getResponseData(data)
+
+  if (!loginData?.accessToken) {
+    throw new Error('로그인 응답에서 인증 토큰을 확인하지 못했습니다.')
   }
 
   return data
