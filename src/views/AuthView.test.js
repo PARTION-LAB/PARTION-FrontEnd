@@ -67,6 +67,52 @@ describe('AuthView', () => {
     expect(wrapper.emitted('navigate')?.[0]).toEqual(['products'])
   })
 
+  it('stores the access token when login response has no member payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(JSON.stringify({
+          accessToken: 'deployed-access-token',
+          tokenType: 'Bearer',
+          expiresIn: 1800,
+        })),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(AuthView)
+
+    await wrapper.get('input[autocomplete="email"]').setValue('user123@example.com')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('securePassword123!')
+    await wrapper.get('.auth-form').trigger('submit')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(localStorage.getItem('partionAccessToken')).toBe('deployed-access-token')
+    expect(localStorage.getItem('partionMember')).toBeNull()
+    expect(wrapper.text()).toContain('로그인되었습니다.')
+    expect(wrapper.emitted('navigate')?.[0]).toEqual(['products'])
+  })
+
+  it('shows an error and stays on login when login response has no access token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<!doctype html><html></html>'),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(AuthView)
+
+    await wrapper.get('input[autocomplete="email"]').setValue('user123@example.com')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('securePassword123!')
+    await wrapper.get('.auth-form').trigger('submit')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(localStorage.getItem('partionAccessToken')).toBeNull()
+    expect(wrapper.text()).toContain('로그인 응답에서 인증 토큰을 확인하지 못했습니다.')
+    expect(wrapper.emitted('navigate')).toBeUndefined()
+  })
+
   it('shows signup validation before calling the API', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
