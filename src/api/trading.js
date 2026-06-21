@@ -210,7 +210,7 @@ function sortOrderBookLevelsByHighPrice(levels) {
 
 export async function getOrderBook(productId, { depth = 10 } = {}) {
   const data = await handleResponse(
-    await request(appendQuery(`/api/products/${productId}/orderbook`, { depth })),
+    await request(appendQuery(`/api/trading/products/${productId}/orderbook`, { depth })),
     '호가창을 불러오지 못했습니다.',
   )
 
@@ -245,7 +245,7 @@ export function normalizeTrade(trade) {
 
 export async function getRecentTrades(productId, { size = 20 } = {}) {
   const data = await handleResponse(
-    await request(appendQuery(`/api/products/${productId}/trades/recent`, { limit: size })),
+    await request(appendQuery(`/api/trading/products/${productId}/trades`, { size })),
     '최근 체결을 불러오지 못했습니다.',
   )
   const content = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
