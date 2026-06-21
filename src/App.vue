@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { logoutUser } from './api/auth'
+import AiChatWidget from './components/AiChatWidget.vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import { useAuth } from './composables/useAuth'
 
@@ -38,4 +39,5 @@ async function logout() {
   <RouterView v-slot="{ Component }">
     <component :is="Component" @navigate="navigate" />
   </RouterView>
+  <AiChatWidget :is-authenticated="isAuthenticated" @navigate="navigate" />
 </template>
