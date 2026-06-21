@@ -61,7 +61,7 @@ let nextPaymentId = 2
 let nextBlockId = 4
 const invalidatedRefreshTokens = new Set()
 const savedPaymentAmounts = new Map()
-const emailVerificationCodes = new Map()
+const emailVerificationLinks = new Map()
 const emailVerificationVerifiedUntil = new Map()
 
 const investments = [
@@ -502,8 +502,9 @@ async function handleAuth(request, response, url) {
       return
     }
 
-    emailVerificationCodes.set(emailVerificationKey(email, purpose), {
-      code: '123456',
+    const token = `${purpose.toLowerCase()}-${Date.now()}`
+    emailVerificationLinks.set(emailVerificationKey(token, purpose), {
+      email,
       expiresAt: Date.now() + 300_000,
     })
     ok(response, {
@@ -514,33 +515,62 @@ async function handleAuth(request, response, url) {
     return
   }
 
-  if (request.method === 'POST' && pathname === '/api/auth/email/verify') {
+  if (request.method === 'GET' && pathname === '/api/auth/email/verify-link') {
+    const purpose = String(url.searchParams.get('purpose') || '').toUpperCase()
+    const token = String(url.searchParams.get('token') || '').trim()
+    const key = emailVerificationKey(token, purpose)
+    const verification = emailVerificationLinks.get(key)
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:5173'
+    const path = purpose === 'PASSWORD_RESET' ? '/password-reset' : '/signup'
+
+    if (!verification || verification.expiresAt < Date.now()) {
+      response.writeHead(302, {
+        Location: `${frontendBaseUrl}${path}?emailVerified=false&reason=expired`,
+      })
+      response.end()
+      return
+    }
+
+    emailVerificationVerifiedUntil.set(
+      emailVerificationKey(verification.email, purpose),
+      Date.now() + 1_800_000,
+    )
+    emailVerificationLinks.delete(key)
+    response.writeHead(302, {
+      Location: `${frontendBaseUrl}${path}?emailVerified=true&email=${encodeURIComponent(verification.email)}`,
+    })
+    response.end()
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/auth/password/reset') {
     const body = await readBody(request, response)
     if (!body) return
 
     const email = String(body.email || '').trim()
-    const purpose = String(body.purpose || '').toUpperCase()
-    const code = String(body.code || '').trim()
-    const key = emailVerificationKey(email, purpose)
-    const verification = emailVerificationCodes.get(key)
+    const newPassword = String(body.newPassword || '')
+    const user = users.get(email)
 
-    if (!verification || verification.expiresAt < Date.now()) {
-      fail(response, 400, '인증번호가 만료되었습니다')
+    if (!user) {
+      fail(response, 404, '회원을 찾을 수 없습니다')
       return
     }
 
-    if (verification.code !== code) {
-      fail(response, 400, '인증번호가 일치하지 않습니다')
+    const verifiedUntil = emailVerificationVerifiedUntil.get(emailVerificationKey(email, 'PASSWORD_RESET')) || 0
+
+    if (verifiedUntil < Date.now()) {
+      fail(response, 400, '이메일 인증을 완료해주세요')
       return
     }
 
-    emailVerificationVerifiedUntil.set(key, Date.now() + 1_800_000)
-    ok(response, {
-      email,
-      purpose,
-      verified: true,
-      expiresIn: 1800,
-    })
+    if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d\s]).{8,20}$/.test(newPassword)) {
+      fail(response, 400, '비밀번호는 영문, 숫자, 특수문자를 포함해 8자 이상 20자 이하로 입력해주세요.')
+      return
+    }
+
+    user.password = newPassword
+    emailVerificationVerifiedUntil.delete(emailVerificationKey(email, 'PASSWORD_RESET'))
+    ok(response, { email })
     return
   }
 

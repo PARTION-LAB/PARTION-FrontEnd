@@ -558,6 +558,13 @@ button {
   color: var(--ink);
 }
 
+.auth-form input:disabled,
+.register-form input:disabled {
+  background: #f4f6f8;
+  color: var(--muted);
+  opacity: 1;
+}
+
 .verification-panel {
   display: grid;
   gap: 10px;
@@ -567,8 +574,7 @@ button {
   background: #f8fafc;
 }
 
-.verification-actions,
-.verification-code-row {
+.verification-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -641,6 +647,23 @@ button {
 
 .auth-message.error {
   color: var(--warning);
+}
+
+.auth-footer-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  border-top: 1px solid #edf0f2;
+  padding-top: 18px;
+}
+
+.auth-footer-actions button {
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--blue);
+  font-weight: 900;
 }
 
 .profile-page {

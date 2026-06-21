@@ -153,7 +153,7 @@ export async function registerUser({ nickname, email, password }) {
   return data
 }
 
-export async function sendEmailVerificationCode({ email, purpose = 'SIGNUP' }) {
+export async function sendEmailVerificationLink({ email, purpose = 'SIGNUP' }) {
   if (USE_MOCK_API) {
     await new Promise((resolve) => {
       setTimeout(resolve, 300)
@@ -184,46 +184,44 @@ export async function sendEmailVerificationCode({ email, purpose = 'SIGNUP' }) {
   const data = await parseResponse(response)
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, '인증번호 발송에 실패했습니다.'))
+    throw new Error(getErrorMessage(data, '인증 메일 발송에 실패했습니다.'))
   }
 
   return data
 }
 
-export async function verifyEmailCode({ email, code, purpose = 'SIGNUP' }) {
+export const sendEmailVerificationCode = sendEmailVerificationLink
+
+export async function resetPassword({ email, newPassword }) {
   if (USE_MOCK_API) {
     await new Promise((resolve) => {
       setTimeout(resolve, 300)
     })
 
-    if (!/^\d{6}$/.test(code)) {
-      throw new Error('인증번호 6자리를 입력해주세요.')
+    if (!email || !newPassword) {
+      throw new Error('이메일과 새 비밀번호를 입력해주세요.')
     }
 
     return {
       email,
-      purpose,
-      verified: true,
-      expiresIn: 1800,
     }
   }
 
-  const response = await fetch(buildApiUrl('/api/auth/email/verify'), {
+  const response = await fetch(buildApiUrl('/api/auth/password/reset'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       email,
-      purpose,
-      code,
+      newPassword,
     }),
   })
 
   const data = await parseResponse(response)
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, '인증번호 확인에 실패했습니다.'))
+    throw new Error(getErrorMessage(data, '비밀번호 재설정에 실패했습니다.'))
   }
 
   return data

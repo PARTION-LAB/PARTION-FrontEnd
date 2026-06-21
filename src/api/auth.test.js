@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   logoutUser,
   reissueAccessToken,
-  sendEmailVerificationCode,
-  verifyEmailCode,
+  resetPassword,
+  sendEmailVerificationLink,
 } from './auth'
 
 describe('auth API', () => {
@@ -71,7 +71,7 @@ describe('auth API', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await sendEmailVerificationCode({
+    const result = await sendEmailVerificationLink({
       email: 'user123@example.com',
       purpose: 'SIGNUP',
     })
@@ -90,26 +90,22 @@ describe('auth API', () => {
     expect(result.expiresIn).toBe(300)
   })
 
-  it('calls email verification check API', async () => {
+  it('calls password reset API', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       text: () =>
         Promise.resolve(JSON.stringify({
           email: 'user123@example.com',
-          purpose: 'SIGNUP',
-          verified: true,
-          expiresIn: 1800,
         })),
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await verifyEmailCode({
+    const result = await resetPassword({
       email: 'user123@example.com',
-      purpose: 'SIGNUP',
-      code: '123456',
+      newPassword: 'newPassword123!',
     })
 
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/email\/verify$/)
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/password\/reset$/)
     expect(fetchMock.mock.calls[0][1]).toEqual({
       method: 'POST',
       headers: {
@@ -117,10 +113,9 @@ describe('auth API', () => {
       },
       body: JSON.stringify({
         email: 'user123@example.com',
-        purpose: 'SIGNUP',
-        code: '123456',
+        newPassword: 'newPassword123!',
       }),
     })
-    expect(result.verified).toBe(true)
+    expect(result.email).toBe('user123@example.com')
   })
 })
