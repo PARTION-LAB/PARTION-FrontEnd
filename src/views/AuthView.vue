@@ -220,6 +220,10 @@ const OAUTH_LOGIN_OPTIONS = {
     label: 'Google',
     stateKey: 'partionGoogleOAuthState',
   },
+  kakao: {
+    label: 'Kakao',
+    stateKey: 'partionKakaoOAuthState',
+  },
   naver: {
     label: 'Naver',
     stateKey: 'partionNaverOAuthState',
@@ -362,7 +366,10 @@ async function handleOAuthLogin(provider) {
           <span class="google">G</span>
           {{ startingOAuthProvider === 'google' ? 'Google 연결 중...' : 'Google 로그인' }}
         </button>
-        <button type="button"><span class="kakao">K</span>Kakao 로그인</button>
+        <button type="button" :disabled="isStartingOAuthLogin" @click="handleOAuthLogin('kakao')">
+          <span class="kakao">K</span>
+          {{ startingOAuthProvider === 'kakao' ? 'Kakao 연결 중...' : 'Kakao 로그인' }}
+        </button>
         <button type="button" :disabled="isStartingOAuthLogin" @click="handleOAuthLogin('naver')">
           <span class="naver">N</span>
           {{ startingOAuthProvider === 'naver' ? 'Naver 연결 중...' : 'Naver 로그인' }}
