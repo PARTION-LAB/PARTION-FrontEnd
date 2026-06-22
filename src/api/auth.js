@@ -126,6 +126,72 @@ export async function loginUser({ email, password }) {
   return data
 }
 
+export async function getNaverOAuthAuthorizationUrl() {
+  if (USE_MOCK_API) {
+    const state = `mock-naver-state-${Date.now()}`
+
+    return {
+      authorizationUrl: `/oauth/naver/callback?code=mock-code&state=${state}`,
+      state,
+    }
+  }
+
+  const response = await fetch(buildApiUrl('/api/auth/oauth/naver/authorization-url'), {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  const data = await parseResponse(response)
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, 'Naver 로그인 URL을 가져오지 못했습니다.'))
+  }
+
+  return getResponseData(data)
+}
+
+export async function loginWithNaverOAuthCode({ code, state }) {
+  if (USE_MOCK_API) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 300)
+    })
+
+    if (!code || !state) {
+      throw new Error('Naver 로그인 응답을 확인하지 못했습니다.')
+    }
+
+    return createMockLoginResponse('naver-user@example.com')
+  }
+
+  const response = await fetch(buildApiUrl('/api/auth/oauth/naver/login'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code,
+      state,
+    }),
+  })
+
+  const data = await parseResponse(response)
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, 'Naver 로그인에 실패했습니다.'))
+  }
+
+  const loginData = getResponseData(data)
+
+  if (!loginData?.accessToken) {
+    throw new Error('로그인 응답에서 인증 토큰을 확인하지 못했습니다.')
+  }
+
+  return data
+}
+
 export async function registerUser({ nickname, email, password }) {
   if (USE_MOCK_API) {
     await new Promise((resolve) => {

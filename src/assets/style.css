@@ -827,6 +827,11 @@ button {
   font-weight: 900;
 }
 
+.social-login button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .social-login span {
   display: grid;
   width: 24px;
@@ -850,6 +855,19 @@ button {
 .naver {
   background: #03c75a;
   color: #ffffff;
+}
+
+.oauth-callback-card {
+  gap: 16px;
+}
+
+.oauth-callback-card > button:last-child {
+  height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #ffffff;
+  font-weight: 900;
 }
 
 .register-page {
