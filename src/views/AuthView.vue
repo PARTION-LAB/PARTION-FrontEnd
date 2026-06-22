@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  getNaverOAuthAuthorizationUrl,
+  getOAuthAuthorizationUrl,
   loginUser,
   registerUser,
   sendEmailVerificationLink,
@@ -23,9 +23,10 @@ const isSubmitting = ref(false)
 const isSendingVerification = ref(false)
 const authMessage = ref('')
 const authMessageType = ref('info')
-const isStartingNaverLogin = ref(false)
+const startingOAuthProvider = ref('')
 
 const isLogin = computed(() => authMode.value === 'login')
+const isStartingOAuthLogin = computed(() => Boolean(startingOAuthProvider.value))
 const title = computed(() => (isLogin.value ? '로그인하고 투자를 이어가세요' : '회원가입하고 투자를 시작하세요'))
 const submitLabel = computed(() => (isLogin.value ? '로그인' : '회원가입'))
 const trimmedEmail = computed(() => email.value.trim())
@@ -214,22 +215,40 @@ async function handleSubmit() {
   }
 }
 
-async function handleNaverLogin() {
-  isStartingNaverLogin.value = true
+const OAUTH_LOGIN_OPTIONS = {
+  google: {
+    label: 'Google',
+    stateKey: 'partionGoogleOAuthState',
+  },
+  naver: {
+    label: 'Naver',
+    stateKey: 'partionNaverOAuthState',
+  },
+}
+
+async function handleOAuthLogin(provider) {
+  const option = OAUTH_LOGIN_OPTIONS[provider]
+
+  if (!option) {
+    setMessage('지원하지 않는 OAuth 로그인입니다.', 'error')
+    return
+  }
+
+  startingOAuthProvider.value = provider
   setMessage('')
 
   try {
-    const data = await getNaverOAuthAuthorizationUrl()
+    const data = await getOAuthAuthorizationUrl(provider)
 
     if (!data?.authorizationUrl || !data?.state) {
-      throw new Error('Naver 로그인 URL을 확인하지 못했습니다.')
+      throw new Error(`${option.label} 로그인 URL을 확인하지 못했습니다.`)
     }
 
-    localStorage.setItem('partionNaverOAuthState', data.state)
+    localStorage.setItem(option.stateKey, data.state)
     window.location.assign(data.authorizationUrl)
   } catch (error) {
-    setMessage(error.message || 'Naver 로그인을 시작하지 못했습니다.', 'error')
-    isStartingNaverLogin.value = false
+    setMessage(error.message || `${option.label} 로그인을 시작하지 못했습니다.`, 'error')
+    startingOAuthProvider.value = ''
   }
 }
 </script>
@@ -339,11 +358,14 @@ async function handleNaverLogin() {
           비밀번호를 잊으셨나요?
         </button>
         <p>소셜 계정으로 계속하기</p>
-        <button type="button"><span class="google">G</span>Google 로그인</button>
+        <button type="button" :disabled="isStartingOAuthLogin" @click="handleOAuthLogin('google')">
+          <span class="google">G</span>
+          {{ startingOAuthProvider === 'google' ? 'Google 연결 중...' : 'Google 로그인' }}
+        </button>
         <button type="button"><span class="kakao">K</span>Kakao 로그인</button>
-        <button type="button" :disabled="isStartingNaverLogin" @click="handleNaverLogin">
+        <button type="button" :disabled="isStartingOAuthLogin" @click="handleOAuthLogin('naver')">
           <span class="naver">N</span>
-          {{ isStartingNaverLogin ? 'Naver 연결 중...' : 'Naver 로그인' }}
+          {{ startingOAuthProvider === 'naver' ? 'Naver 연결 중...' : 'Naver 로그인' }}
         </button>
       </div>
     </section>
