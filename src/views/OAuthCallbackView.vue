@@ -9,6 +9,10 @@ const OAUTH_PROVIDERS = {
     label: 'Google',
     stateKey: 'partionGoogleOAuthState',
   },
+  kakao: {
+    label: 'Kakao',
+    stateKey: 'partionKakaoOAuthState',
+  },
   naver: {
     label: 'Naver',
     stateKey: 'partionNaverOAuthState',

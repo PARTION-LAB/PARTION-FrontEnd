@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getGoogleOAuthAuthorizationUrl,
+  getOAuthAuthorizationUrl,
   loginWithGoogleOAuthCode,
   logoutUser,
   reissueAccessToken,
@@ -145,6 +146,23 @@ describe('auth API', () => {
       }),
     })
     expect(result.accessToken).toBe('google-access-token')
+  })
+
+  it('gets Kakao OAuth authorization URL through the shared provider path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(JSON.stringify({
+          authorizationUrl: 'https://kauth.kakao.com/oauth/authorize',
+          state: 'kakao-state',
+        })),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getOAuthAuthorizationUrl('kakao')
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/oauth\/kakao\/authorization-url$/)
+    expect(result.state).toBe('kakao-state')
   })
 
   it('calls password reset API', async () => {
