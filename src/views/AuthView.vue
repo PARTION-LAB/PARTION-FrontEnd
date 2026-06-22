@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
+  getNaverOAuthAuthorizationUrl,
   loginUser,
   registerUser,
   sendEmailVerificationLink,
@@ -22,6 +23,7 @@ const isSubmitting = ref(false)
 const isSendingVerification = ref(false)
 const authMessage = ref('')
 const authMessageType = ref('info')
+const isStartingNaverLogin = ref(false)
 
 const isLogin = computed(() => authMode.value === 'login')
 const title = computed(() => (isLogin.value ? '로그인하고 투자를 이어가세요' : '회원가입하고 투자를 시작하세요'))
@@ -211,6 +213,25 @@ async function handleSubmit() {
     isSubmitting.value = false
   }
 }
+
+async function handleNaverLogin() {
+  isStartingNaverLogin.value = true
+  setMessage('')
+
+  try {
+    const data = await getNaverOAuthAuthorizationUrl()
+
+    if (!data?.authorizationUrl || !data?.state) {
+      throw new Error('Naver 로그인 URL을 확인하지 못했습니다.')
+    }
+
+    localStorage.setItem('partionNaverOAuthState', data.state)
+    window.location.assign(data.authorizationUrl)
+  } catch (error) {
+    setMessage(error.message || 'Naver 로그인을 시작하지 못했습니다.', 'error')
+    isStartingNaverLogin.value = false
+  }
+}
 </script>
 
 <template>
@@ -320,7 +341,10 @@ async function handleSubmit() {
         <p>소셜 계정으로 계속하기</p>
         <button type="button"><span class="google">G</span>Google 로그인</button>
         <button type="button"><span class="kakao">K</span>Kakao 로그인</button>
-        <button type="button"><span class="naver">N</span>Naver 로그인</button>
+        <button type="button" :disabled="isStartingNaverLogin" @click="handleNaverLogin">
+          <span class="naver">N</span>
+          {{ isStartingNaverLogin ? 'Naver 연결 중...' : 'Naver 로그인' }}
+        </button>
       </div>
     </section>
   </main>
