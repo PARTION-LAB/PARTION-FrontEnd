@@ -126,17 +126,30 @@ export async function loginUser({ email, password }) {
   return data
 }
 
-export async function getNaverOAuthAuthorizationUrl() {
+function getOAuthProviderLabel(provider) {
+  const labels = {
+    google: 'Google',
+    naver: 'Naver',
+    kakao: 'Kakao',
+  }
+
+  return labels[provider] || provider
+}
+
+export async function getOAuthAuthorizationUrl(provider) {
+  const normalizedProvider = provider?.toLowerCase()
+  const providerLabel = getOAuthProviderLabel(normalizedProvider)
+
   if (USE_MOCK_API) {
-    const state = `mock-naver-state-${Date.now()}`
+    const state = `mock-${normalizedProvider}-state-${Date.now()}`
 
     return {
-      authorizationUrl: `/oauth/naver/callback?code=mock-code&state=${state}`,
+      authorizationUrl: `/oauth/${normalizedProvider}/callback?code=mock-code&state=${state}`,
       state,
     }
   }
 
-  const response = await fetch(buildApiUrl('/api/auth/oauth/naver/authorization-url'), {
+  const response = await fetch(buildApiUrl(`/api/auth/oauth/${normalizedProvider}/authorization-url`), {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -146,26 +159,29 @@ export async function getNaverOAuthAuthorizationUrl() {
   const data = await parseResponse(response)
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, 'Naver 로그인 URL을 가져오지 못했습니다.'))
+    throw new Error(getErrorMessage(data, `${providerLabel} 로그인 URL을 가져오지 못했습니다.`))
   }
 
   return getResponseData(data)
 }
 
-export async function loginWithNaverOAuthCode({ code, state }) {
+export async function loginWithOAuthCode({ provider, code, state }) {
+  const normalizedProvider = provider?.toLowerCase()
+  const providerLabel = getOAuthProviderLabel(normalizedProvider)
+
   if (USE_MOCK_API) {
     await new Promise((resolve) => {
       setTimeout(resolve, 300)
     })
 
     if (!code || !state) {
-      throw new Error('Naver 로그인 응답을 확인하지 못했습니다.')
+      throw new Error(`${providerLabel} 로그인 응답을 확인하지 못했습니다.`)
     }
 
-    return createMockLoginResponse('naver-user@example.com')
+    return createMockLoginResponse(`${normalizedProvider}-user@example.com`)
   }
 
-  const response = await fetch(buildApiUrl('/api/auth/oauth/naver/login'), {
+  const response = await fetch(buildApiUrl(`/api/auth/oauth/${normalizedProvider}/login`), {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -180,7 +196,7 @@ export async function loginWithNaverOAuthCode({ code, state }) {
   const data = await parseResponse(response)
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data, 'Naver 로그인에 실패했습니다.'))
+    throw new Error(getErrorMessage(data, `${providerLabel} 로그인에 실패했습니다.`))
   }
 
   const loginData = getResponseData(data)
@@ -190,6 +206,22 @@ export async function loginWithNaverOAuthCode({ code, state }) {
   }
 
   return data
+}
+
+export function getGoogleOAuthAuthorizationUrl() {
+  return getOAuthAuthorizationUrl('google')
+}
+
+export function loginWithGoogleOAuthCode({ code, state }) {
+  return loginWithOAuthCode({ provider: 'google', code, state })
+}
+
+export function getNaverOAuthAuthorizationUrl() {
+  return getOAuthAuthorizationUrl('naver')
+}
+
+export function loginWithNaverOAuthCode({ code, state }) {
+  return loginWithOAuthCode({ provider: 'naver', code, state })
 }
 
 export async function registerUser({ nickname, email, password }) {

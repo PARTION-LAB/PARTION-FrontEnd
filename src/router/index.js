@@ -7,7 +7,7 @@ import HomeView from '../views/HomeView.vue'
 import InvestView from '../views/InvestView.vue'
 import LedgerView from '../views/LedgerView.vue'
 import MarketView from '../views/MarketView.vue'
-import NaverOAuthCallbackView from '../views/NaverOAuthCallbackView.vue'
+import OAuthCallbackView from '../views/OAuthCallbackView.vue'
 import PaymentFailView from '../views/PaymentFailView.vue'
 import PaymentSuccessView from '../views/PaymentSuccessView.vue'
 import PasswordResetView from '../views/PasswordResetView.vue'
@@ -106,9 +106,9 @@ const routes = [
     meta: { navKey: 'auth' },
   },
   {
-    path: '/oauth/naver/callback',
-    name: 'naver-oauth-callback',
-    component: NaverOAuthCallbackView,
+    path: '/oauth/:provider/callback',
+    name: 'oauth-callback',
+    component: OAuthCallbackView,
     meta: { navKey: 'auth' },
   },
   {

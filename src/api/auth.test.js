@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  getGoogleOAuthAuthorizationUrl,
+  loginWithGoogleOAuthCode,
   logoutUser,
   reissueAccessToken,
   resetPassword,
@@ -88,6 +90,61 @@ describe('auth API', () => {
       }),
     })
     expect(result.expiresIn).toBe(300)
+  })
+
+  it('gets Google OAuth authorization URL', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(JSON.stringify({
+          authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+          state: 'google-state',
+        })),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getGoogleOAuthAuthorizationUrl()
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/oauth\/google\/authorization-url$/)
+    expect(fetchMock.mock.calls[0][1]).toEqual({
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    expect(result.state).toBe('google-state')
+  })
+
+  it('logs in with Google OAuth code', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(JSON.stringify({
+          accessToken: 'google-access-token',
+          tokenType: 'Bearer',
+          expiresIn: 1800,
+        })),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await loginWithGoogleOAuthCode({
+      code: 'google-code',
+      state: 'google-state',
+    })
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/oauth\/google\/login$/)
+    expect(fetchMock.mock.calls[0][1]).toEqual({
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code: 'google-code',
+        state: 'google-state',
+      }),
+    })
+    expect(result.accessToken).toBe('google-access-token')
   })
 
   it('calls password reset API', async () => {
