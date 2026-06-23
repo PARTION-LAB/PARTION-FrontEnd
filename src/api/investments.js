@@ -150,6 +150,16 @@ export function normalizeInvestment(investment) {
 
   const investmentId = investment.investmentId ?? investment.id
   const totalAmount = investment.totalAmount ?? investment.amount ?? 0
+  const requestedQuantity = Number(investment.requestedQuantity ?? investment.quantity ?? 0)
+  const investedQuantity = Number(investment.investedQuantity ?? investment.quantity ?? 0)
+  const unfilledQuantity = Number(
+    investment.unfilledQuantity ?? Math.max(0, requestedQuantity - investedQuantity),
+  )
+  const leftoverAmount = Number(
+    investment.leftoverAmount ??
+    investment.uninvestedAmount ??
+    Number(investment.pricePerToken ?? investment.unitPrice ?? 0) * unfilledQuantity,
+  )
 
   return {
     ...investment,
@@ -157,7 +167,12 @@ export function normalizeInvestment(investment) {
     investmentId,
     productId: investment.productId,
     productName: investment.productName,
-    quantity: investment.quantity ?? 0,
+    quantity: investment.quantity ?? investedQuantity,
+    requestedQuantity,
+    investedQuantity,
+    unfilledQuantity,
+    leftoverAmount,
+    partialFilled: Boolean(investment.partialFilled ?? unfilledQuantity > 0),
     pricePerToken: investment.pricePerToken ?? investment.unitPrice ?? 0,
     totalAmount,
     amount: totalAmount,

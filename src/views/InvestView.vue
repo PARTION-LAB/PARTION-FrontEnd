@@ -88,6 +88,32 @@ const selectedAmount = computed(() => {
   return selectedProduct.value.unitPrice * selectedPlan.value.tokens
 })
 
+const availableDepositBalance = computed(() => {
+  return Number(wallet.value?.availableBalance ?? 0)
+})
+
+const usedDepositAmount = computed(() => {
+  return Math.min(selectedAmount.value, availableDepositBalance.value)
+})
+
+const requiredDepositAmount = computed(() => {
+  return Math.max(0, selectedAmount.value - availableDepositBalance.value)
+})
+
+const investmentActionLabel = computed(() => {
+  if (isRequestingPayment.value) {
+    return requiredDepositAmount.value > 0 ? '결제 요청 중' : '투자 처리 중'
+  }
+
+  if (!wallet.value) {
+    return 'Toss로 충전 후 투자하기'
+  }
+
+  return requiredDepositAmount.value > 0
+    ? '부족한 예치금 충전 후 투자하기'
+    : '예치금으로 투자하기'
+})
+
 const projectedFundedAmount = computed(() => {
   if (!selectedProduct.value) {
     return 0
@@ -135,13 +161,13 @@ const paymentStatusMessage = computed(() => {
     return '결제 모듈을 준비하고 있습니다.'
   }
 
-  if (wallet.value && wallet.value.availableBalance >= selectedAmount.value) {
+  if (wallet.value && requiredDepositAmount.value <= 0) {
     return '보유 예치금으로 바로 투자할 수 있습니다.'
   }
 
   if (wallet.value) {
     return isPaymentReady.value
-      ? '예치금이 부족하면 Toss 충전 후 투자가 이어집니다.'
+      ? `${formatWon(usedDepositAmount.value)} 예치금을 사용하고 부족한 ${formatWon(requiredDepositAmount.value)}만 Toss로 충전합니다.`
       : '결제 모듈을 불러오는 중입니다.'
   }
 
@@ -189,18 +215,18 @@ function loadTossPaymentsScript() {
 }
 
 async function syncTossAmount() {
-  if (!widgets.value || !selectedAmount.value) {
+  if (!widgets.value || requiredDepositAmount.value <= 0) {
     return
   }
 
   await widgets.value.setAmount({
-    value: selectedAmount.value,
+    value: requiredDepositAmount.value,
     currency: 'KRW',
   })
 }
 
 async function bootstrapPayment() {
-  if (!selectedProduct.value || !selectedAmount.value) {
+  if (!selectedProduct.value || requiredDepositAmount.value <= 0) {
     return
   }
 
@@ -304,8 +330,15 @@ async function loadWallet() {
 }
 
 function applyInvestmentResult(investment) {
-  const quantity = Number(investment?.quantity ?? selectedPlan.value?.tokens ?? 0)
+  const requestedQuantity = Number(investment?.requestedQuantity ?? selectedPlan.value?.tokens ?? 0)
+  const quantity = Number(investment?.investedQuantity ?? investment?.quantity ?? selectedPlan.value?.tokens ?? 0)
+  const unfilledQuantity = Number(
+    investment?.unfilledQuantity ?? Math.max(0, requestedQuantity - quantity),
+  )
   const amount = Number(investment?.totalAmount ?? investment?.amount ?? selectedAmount.value)
+  const leftoverAmount = Number(
+    investment?.leftoverAmount ?? Math.max(0, selectedAmount.value - amount),
+  )
 
   if (selectedProduct.value && amount > 0) {
     selectedProduct.value.fundedAmount = Math.min(
@@ -320,7 +353,9 @@ function applyInvestmentResult(investment) {
     wallet.value.totalBalance = Math.max(0, wallet.value.totalBalance - amount)
   }
 
-  paymentMessage.value = `${quantity}토큰 투자가 완료되었습니다.`
+  paymentMessage.value = unfilledQuantity > 0
+    ? `${quantity}토큰만 투자되었습니다. 남은 ${unfilledQuantity}토큰에 해당하는 ${formatWon(leftoverAmount)}은 예치금으로 보관됩니다.`
+    : `${quantity}토큰 투자가 완료되었습니다.`
 }
 
 async function handlePaymentClick() {
@@ -339,7 +374,7 @@ async function handlePaymentClick() {
   paymentMessage.value = ''
 
   try {
-    if (wallet.value?.availableBalance >= selectedAmount.value) {
+    if (requiredDepositAmount.value <= 0) {
       const investment = await createInvestment({
         productId: selectedProduct.value.productId,
         quantity: selectedPlan.value.tokens,
@@ -356,13 +391,13 @@ async function handlePaymentClick() {
     }
 
     const deposit = await createDepositRequest({
-      amount: selectedAmount.value,
+      amount: requiredDepositAmount.value,
     })
     const orderId = deposit.orderId || getOrderId()
 
     globalThis.sessionStorage.setItem(pendingInvestmentStorageKey, JSON.stringify({
       orderId,
-      amount: selectedAmount.value,
+      amount: requiredDepositAmount.value,
       productId: selectedProduct.value.productId,
       quantity: selectedPlan.value.tokens,
       orderName: orderName.value,
@@ -497,7 +532,7 @@ onMounted(async () => {
               <dd>{{ selectedPlan?.tokens }}토큰</dd>
             </div>
             <div>
-              <dt>결제 금액</dt>
+              <dt>투자 금액</dt>
               <dd>
                 <strong>{{ formatWon(selectedAmount) }}</strong>
               </dd>
@@ -508,10 +543,22 @@ onMounted(async () => {
             </div>
             <div v-if="isAuthenticated">
               <dt>사용 가능 예치금</dt>
-              <dd>{{ wallet ? formatWon(wallet.availableBalance) : '-' }}</dd>
+              <dd>{{ wallet ? formatWon(availableDepositBalance) : '-' }}</dd>
+            </div>
+            <div v-if="isAuthenticated && wallet">
+              <dt>사용할 예치금</dt>
+              <dd>{{ formatWon(usedDepositAmount) }}</dd>
+            </div>
+            <div v-if="isAuthenticated && wallet">
+              <dt>추가 충전 금액</dt>
+              <dd>{{ formatWon(requiredDepositAmount) }}</dd>
             </div>
           </dl>
-          <div class="toss-widget-box" aria-label="Toss 결제 선택 영역">
+          <div
+            v-if="requiredDepositAmount > 0"
+            class="toss-widget-box"
+            aria-label="Toss 결제 선택 영역"
+          >
             <div id="payment-methods"></div>
             <div id="agreement"></div>
           </div>
@@ -520,7 +567,7 @@ onMounted(async () => {
             :disabled="isPreparingPayment || isRequestingPayment || !selectedProduct.open"
             @click="handlePaymentClick"
           >
-            {{ isRequestingPayment ? '결제 요청 중' : '투자 결제하기' }}
+            {{ investmentActionLabel }}
           </button>
           <p class="message" role="status">{{ paymentStatusMessage }}</p>
         </aside>
