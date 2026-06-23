@@ -111,14 +111,6 @@ onUnmounted(stopLedgerAutoRefresh)
           현재 원장의 무결성과 최신 이벤트를 확인합니다.
         </p>
       </div>
-      <button
-        class="primary-link page-action-link"
-        type="button"
-        :disabled="isLoading"
-        @click="refreshLedger"
-      >
-        {{ isLoading ? '불러오는 중' : '원장 새로고침' }}
-      </button>
     </section>
 
     <section class="blockchain-dashboard" aria-live="polite">
