@@ -89,6 +89,10 @@ const marketPrice = computed(() => {
 })
 
 const holdings = computed(() => {
+  if (!isAuthenticated.value) {
+    return []
+  }
+
   if (portfolioHoldings.value.length) {
     return portfolioHoldings.value.map((holding) => {
       const product = tradableProducts.value.find(
@@ -110,23 +114,18 @@ const holdings = computed(() => {
     })
   }
 
-  return tradableProducts.value.map((product, index) => {
-    const quantity = [18, 11, 36, 27, 44][index % 5]
-    const reservedQuantity = index % 2 === 0 ? 2 : 0
-    const marketValue =
-      Math.round(product.unitPrice * [1.032, 0.986, 1.074, 1.018, 0.957][index % 5])
-
-    return {
-      ...product,
-      quantity,
-      reservedQuantity,
-      availableQuantity: quantity - reservedQuantity,
-      marketPrice: marketValue,
-    }
-  })
+  return []
 })
 
 const cash = computed(() => {
+  if (!isAuthenticated.value) {
+    return {
+      balance: 0,
+      reserved: 0,
+      available: 0,
+    }
+  }
+
   if (wallet.value) {
     return {
       balance: wallet.value.totalBalance,
@@ -143,13 +142,10 @@ const cash = computed(() => {
     }
   }
 
-  const balance = 3500000
-  const reserved = 420000
-
   return {
-    balance,
-    reserved,
-    available: balance - reserved,
+    balance: 0,
+    reserved: 0,
+    available: 0,
   }
 })
 
@@ -416,6 +412,22 @@ async function loadAccount() {
   isLoadingAccount.value = false
 }
 
+async function refreshPortfolioHoldings() {
+  if (!isAuthenticated.value || !portfolioHoldings.value.length) {
+    return
+  }
+
+  try {
+    const page = await getPortfolioHoldings({
+      page: 0,
+      size: Math.max(20, portfolioHoldings.value.length),
+    })
+    portfolioHoldings.value = page.content
+  } catch {
+    // Keep the current account snapshot when a silent live-price refresh fails.
+  }
+}
+
 async function loadOrders() {
   if (!isAuthenticated.value) {
     myOrders.value = []
@@ -485,6 +497,8 @@ async function refreshLiveMarketData({ silent = true, includeAccount = true } = 
 
   if (includeAccount) {
     refreshes.push(loadAccount(), loadOrders())
+  } else {
+    refreshes.push(refreshPortfolioHoldings())
   }
 
   await Promise.all(refreshes)
@@ -690,7 +704,7 @@ onUnmounted(() => {
       </p>
     </section>
 
-    <section class="account">
+    <section v-if="isAuthenticated" class="account">
       <div class="section-heading">
         <div>
           <p class="eyebrow">내 계좌</p>
