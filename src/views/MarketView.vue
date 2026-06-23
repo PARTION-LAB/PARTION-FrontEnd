@@ -203,8 +203,18 @@ const reports = computed(() => {
 })
 
 const orderTotal = computed(() => {
-  const price = selectedOrderType.value === 'market' ? marketPrice.value : orderPrice.value
+  const price = orderPrice.value
   return Number(price || 0) * Number(orderQuantity.value || 0)
+})
+
+const orderPriceLabel = computed(() => {
+  if (selectedOrderType.value === 'limit') {
+    return '가격'
+  }
+
+  return selectedSide.value === 'buy'
+    ? '최대 매수 가격'
+    : '최소 매도 가격'
 })
 
 const depositOrderName = computed(() => {
@@ -575,7 +585,7 @@ async function submitOrder() {
   }
 
   const quantity = Number(orderQuantity.value || 0)
-  const price = selectedOrderType.value === 'market' ? marketPrice.value : Number(orderPrice.value || 0)
+  const price = Number(orderPrice.value || 0)
 
   if (quantity <= 0 || price <= 0) {
     tradeMessage.value = '가격과 수량을 확인해주세요.'
@@ -645,6 +655,12 @@ watch(selectedProduct, async () => {
   syncOrderPrice()
   await loadMarketData()
 }, { immediate: true })
+
+watch(selectedOrderType, (orderType) => {
+  if (orderType === 'market') {
+    syncOrderPrice()
+  }
+})
 
 watch(depositAmount, syncDepositTossAmount)
 
@@ -899,10 +915,9 @@ onUnmounted(() => {
                 </button>
               </div>
               <label>
-                가격
+                {{ orderPriceLabel }}
                 <input
                   v-model.number="orderPrice"
-                  :disabled="selectedOrderType === 'market'"
                   min="1"
                   step="1"
                   type="number"
