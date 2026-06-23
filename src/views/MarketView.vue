@@ -334,8 +334,36 @@ function getOrderStatusLabel(status) {
   return labels[status] || status || '대기'
 }
 
+function getBestAskPrice() {
+  const prices = orderBook.value.asks
+    .map((ask) => Number(ask.price || 0))
+    .filter((price) => price > 0)
+
+  return prices.length ? Math.min(...prices) : 0
+}
+
+function getBestBidPrice() {
+  const prices = orderBook.value.bids
+    .map((bid) => Number(bid.price || 0))
+    .filter((price) => price > 0)
+
+  return prices.length ? Math.max(...prices) : 0
+}
+
+function getDefaultMarketProtectionPrice() {
+  const orderBookPrice = selectedSide.value === 'buy'
+    ? getBestAskPrice()
+    : getBestBidPrice()
+
+  return orderBookPrice || marketPrice.value
+}
+
 function syncOrderPrice() {
-  orderPrice.value = marketPrice.value
+  const price = selectedOrderType.value === 'market'
+    ? getDefaultMarketProtectionPrice()
+    : marketPrice.value
+
+  orderPrice.value = Number.isFinite(price) ? price : 0
 }
 
 async function loadTradingProducts({ keyword = '' } = {}) {
@@ -668,10 +696,19 @@ async function handleCancelOrder(orderId) {
 watch(selectedProduct, async () => {
   syncOrderPrice()
   await loadMarketData()
+  if (selectedOrderType.value === 'market') {
+    syncOrderPrice()
+  }
 }, { immediate: true })
 
 watch(selectedOrderType, (orderType) => {
   if (orderType === 'market') {
+    syncOrderPrice()
+  }
+})
+
+watch(selectedSide, () => {
+  if (selectedOrderType.value === 'market') {
     syncOrderPrice()
   }
 })
