@@ -406,6 +406,22 @@ async function loadAccount() {
   isLoadingAccount.value = false
 }
 
+async function refreshPortfolioHoldings() {
+  if (!isAuthenticated.value || !portfolioHoldings.value.length) {
+    return
+  }
+
+  try {
+    const page = await getPortfolioHoldings({
+      page: 0,
+      size: Math.max(20, portfolioHoldings.value.length),
+    })
+    portfolioHoldings.value = page.content
+  } catch {
+    // Keep the current account snapshot when a silent live-price refresh fails.
+  }
+}
+
 async function loadOrders() {
   if (!isAuthenticated.value) {
     myOrders.value = []
@@ -475,6 +491,8 @@ async function refreshLiveMarketData({ silent = true, includeAccount = true } = 
 
   if (includeAccount) {
     refreshes.push(loadAccount(), loadOrders())
+  } else {
+    refreshes.push(refreshPortfolioHoldings())
   }
 
   await Promise.all(refreshes)
