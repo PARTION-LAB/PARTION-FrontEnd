@@ -15,6 +15,22 @@ const paymentKey = computed(() => String(route.query.paymentKey || ''))
 const orderId = computed(() => String(route.query.orderId || ''))
 const amount = computed(() => Number(route.query.amount || 0))
 
+function getInvestmentSuccessMessage(result) {
+  const investedQuantity = Number(result?.investedQuantity ?? result?.quantity ?? 0)
+  const unfilledQuantity = Number(result?.unfilledQuantity ?? 0)
+  const leftoverAmount = Number(result?.leftoverAmount ?? 0)
+
+  if (investedQuantity <= 0 && unfilledQuantity > 0) {
+    return `투자는 진행되지 않았고 ${formatWon(leftoverAmount)}은 예치금으로 보관됩니다.`
+  }
+
+  if (unfilledQuantity > 0) {
+    return `${investedQuantity}토큰만 투자되었습니다. 남은 ${unfilledQuantity}토큰에 해당하는 ${formatWon(leftoverAmount)}은 예치금으로 보관됩니다.`
+  }
+
+  return '예치금 충전 후 투자가 완료되었습니다.'
+}
+
 function getPendingInvestment() {
   const saved = globalThis.sessionStorage.getItem(pendingInvestmentStorageKey)
 
@@ -40,16 +56,22 @@ onMounted(async () => {
     })
 
     if (pendingInvestment?.productId && pendingInvestment?.quantity) {
-      investment.value = await createInvestment({
-        productId: pendingInvestment.productId,
-        quantity: pendingInvestment.quantity,
-      })
-      globalThis.sessionStorage.removeItem(pendingInvestmentStorageKey)
+      try {
+        investment.value = await createInvestment({
+          productId: pendingInvestment.productId,
+          quantity: pendingInvestment.quantity,
+        })
+        globalThis.sessionStorage.removeItem(pendingInvestmentStorageKey)
+      } catch (investmentError) {
+        status.value = 'success'
+        message.value = `예치금 충전은 완료되었습니다. ${investmentError.message || '투자는 처리하지 못했으며 충전 금액은 예치금으로 보관됩니다.'}`
+        return
+      }
     }
 
     status.value = 'success'
     message.value = investment.value
-      ? '예치금 충전 후 투자가 완료되었습니다.'
+      ? getInvestmentSuccessMessage(investment.value)
       : '예치금 충전이 완료되었습니다.'
   } catch (error) {
     status.value = 'error'
