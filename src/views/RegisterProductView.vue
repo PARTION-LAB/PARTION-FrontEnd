@@ -9,6 +9,7 @@ const { isAuthenticated } = useAuth()
 const selectedAssetType = ref('부동산')
 const formValues = ref({})
 const imageFile = ref(null)
+const imageInputRef = ref(null)
 const message = ref('')
 const isSubmitting = ref(false)
 const isLoadingMyProducts = ref(false)
@@ -40,7 +41,7 @@ const assetTypeOptions = [
       ['예상 수익 표시', '예: 연 6.4%'],
       ['정산 방식', '분기 배당'],
       ['리스크 등급', '중위험'],
-      ['모집 마감일', 'mm/dd/yyyy'],
+      ['모집 마감일', 'YYYY-MM-DD'],
     ],
   },
   {
@@ -68,7 +69,7 @@ const assetTypeOptions = [
       ['예상 수익 표시', '예: 매각 차익형'],
       ['정산 방식', '매각 정산'],
       ['리스크 등급', '중고위험'],
-      ['모집 마감일', 'mm/dd/yyyy'],
+      ['모집 마감일', 'YYYY-MM-DD'],
     ],
   },
   {
@@ -97,7 +98,7 @@ const assetTypeOptions = [
       ['예상 수익 표시', '예: 저작권료 수익률 7.5%'],
       ['정산 방식', '월 정산'],
       ['리스크 등급', '중위험'],
-      ['거래 시작일', 'mm/dd/yyyy'],
+      ['거래 시작일', 'YYYY-MM-DD'],
     ],
   },
 ]
@@ -121,6 +122,14 @@ const extraInfoFieldByAssetType = {
   음악저작권: '아티스트',
 }
 
+const dateFieldLabels = new Set(['모집 마감일', '거래 시작일'])
+
+const minSelectableDate = computed(() => {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  return formatDateInputValue(tomorrow)
+})
+
 const visibleMessage = computed(() => {
   if (message.value) {
     return message.value
@@ -128,6 +137,8 @@ const visibleMessage = computed(() => {
 
   return isAuthenticated.value ? '' : '로그인 후 상품을 등록할 수 있습니다.'
 })
+
+const selectedImageFileName = computed(() => imageFile.value?.name || '')
 
 function updateField(label, value) {
   formValues.value = {
@@ -138,6 +149,18 @@ function updateField(label, value) {
 
 function readField(label) {
   return formValues.value[label] || ''
+}
+
+function formatDateInputValue(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function isDateField(label) {
+  return dateFieldLabels.has(label)
 }
 
 function toNumber(value) {
@@ -176,6 +199,10 @@ function validateForm() {
 
   if (!getDeadline()) {
     return '모집 마감일 또는 거래 시작일을 입력해주세요.'
+  }
+
+  if (getDeadline() < minSelectableDate.value) {
+    return '오늘 이후 날짜를 선택해주세요.'
   }
 
   return ''
@@ -234,6 +261,9 @@ async function submitProduct() {
 
     formValues.value = {}
     imageFile.value = null
+    if (imageInputRef.value) {
+      imageInputRef.value.value = ''
+    }
     message.value = '상품이 등록되었습니다.'
     await loadMyProducts()
   } catch (error) {
@@ -314,10 +344,23 @@ onMounted(loadMyProducts)
                   @input="updateField(label, $event.target.value)"
                 />
               </label>
-              <label>
+              <div class="file-field">
                 <span>대표 이미지 파일</span>
-                <input accept="image/*" type="file" @change="handleImageFileChange" />
-              </label>
+                <label class="file-upload-control" for="representative-image-file">
+                  <input
+                    id="representative-image-file"
+                    ref="imageInputRef"
+                    accept="image/*"
+                    class="file-upload-input"
+                    type="file"
+                    @change="handleImageFileChange"
+                  />
+                  <span class="file-upload-button">파일 선택</span>
+                  <span v-if="selectedImageFileName" class="file-upload-name">
+                    {{ selectedImageFileName }}
+                  </span>
+                </label>
+              </div>
             </div>
           </section>
 
@@ -329,7 +372,9 @@ onMounted(loadMyProducts)
                 <span>{{ label }}</span>
                 <input
                   :value="readField(label)"
-                  :placeholder="placeholder"
+                  :min="isDateField(label) ? minSelectableDate : undefined"
+                  :placeholder="isDateField(label) ? undefined : placeholder"
+                  :type="isDateField(label) ? 'date' : 'text'"
                   @input="updateField(label, $event.target.value)"
                 />
               </label>

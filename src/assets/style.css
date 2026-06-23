@@ -544,7 +544,8 @@ button {
 }
 
 .auth-form label,
-.register-form label {
+.register-form label,
+.register-form .file-field {
   display: grid;
   gap: 8px;
   color: var(--muted);
@@ -2347,6 +2348,63 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+
+.file-upload-control {
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 6px 13px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.register-form .file-upload-input {
+  position: absolute;
+  width: 1px;
+  min-height: 0;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-upload-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #f8fafc;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.file-upload-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-upload-input:focus-visible + .file-upload-button {
+  outline: 2px solid rgba(0, 100, 255, 0.32);
+  outline-offset: 2px;
 }
 
 .form-section > label + label {
