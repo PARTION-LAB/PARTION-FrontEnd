@@ -338,10 +338,20 @@ button {
   padding: 22px;
   background: #ffffff;
   box-shadow: var(--shadow);
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
 }
 
 .product-card:nth-child(3n + 1) {
   background: #fbfcfd;
+}
+
+.product-card:focus-within {
+  border-color: rgba(0, 100, 255, 0.28);
+  box-shadow: 0 20px 46px rgba(24, 32, 37, 0.12);
+  transform: translateY(-4px);
 }
 
 .product-image {
@@ -349,6 +359,31 @@ button {
   border-radius: 8px;
   background-position: center;
   background-size: cover;
+  transition: filter 0.22s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .product-card:hover {
+    border-color: rgba(0, 100, 255, 0.28);
+    box-shadow: 0 22px 48px rgba(24, 32, 37, 0.13);
+    transform: translateY(-6px);
+  }
+
+  .product-card:hover .product-image {
+    filter: saturate(1.08) brightness(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card,
+  .product-image {
+    transition: none;
+  }
+
+  .product-card:hover,
+  .product-card:focus-within {
+    transform: none;
+  }
 }
 
 .badge {
