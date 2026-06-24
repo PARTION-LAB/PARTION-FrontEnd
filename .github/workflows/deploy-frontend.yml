@@ -46,7 +46,7 @@ jobs:
           VITE_DATADOG_RUM_ENV: "prod"
           VITE_DATADOG_RUM_VERSION: ${{ github.event.workflow_run.head_sha }}
           VITE_DATADOG_RUM_SESSION_SAMPLE_RATE: "100"
-          VITE_DATADOG_RUM_SESSION_REPLAY_SAMPLE_RATE: "0"
+          VITE_DATADOG_RUM_SESSION_REPLAY_SAMPLE_RATE: "20"
           VITE_DATADOG_RUM_PRIVACY_LEVEL: "mask-user-input"
         run: npm run build
 
