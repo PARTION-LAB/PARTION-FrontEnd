@@ -93,6 +93,36 @@ describe('AuthView', () => {
     expect(wrapper.emitted('navigate')?.[0]).toEqual(['products'])
   })
 
+  it('returns to the redirect page after login', async () => {
+    mockRoute = {
+      name: 'login',
+      query: {
+        redirect: '/market?asset=music',
+      },
+    }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () =>
+        Promise.resolve(JSON.stringify({
+          accessToken: 'redirect-access-token',
+          tokenType: 'Bearer',
+          expiresIn: 1800,
+        })),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(AuthView)
+
+    await wrapper.get('input[autocomplete="email"]').setValue('user123@example.com')
+    await wrapper.get('input[autocomplete="current-password"]').setValue('securePassword123!')
+    await wrapper.get('.auth-form').trigger('submit')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(localStorage.getItem('partionAccessToken')).toBe('redirect-access-token')
+    expect(wrapper.emitted('navigate')?.[0]).toEqual([{ path: '/market?asset=music' }])
+  })
+
   it('shows an error and stays on login when login response has no access token', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
