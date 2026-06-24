@@ -31,8 +31,24 @@ const products = sourceProducts.map((product, index) => {
     categoryKey: product.categoryKey,
     categoryName: product.category,
     summary: product.summary,
-    description: `${product.summary} 로컬 mock 상세 설명입니다.`,
+    description: product.description || `${product.summary} 로컬 mock 상세 설명입니다.`,
     imageUrl: product.imageUrl,
+    extraInfo: product.extraInfo,
+    assetTitle: product.assetTitle,
+    location: product.location,
+    completionYear: product.completionYear,
+    assetUse: product.assetUse,
+    trackTitle: product.trackTitle,
+    artworkTitle: product.artworkTitle,
+    artist: product.artist,
+    albumTitle: product.albumTitle,
+    artworkYear: product.artworkYear,
+    collection: product.collection,
+    chartSource: product.chartSource,
+    chartRank: product.chartRank,
+    chartWeek: product.chartWeek,
+    sourceName: product.sourceName,
+    license: product.license,
     status: product.open ? 'RECRUITING' : 'TRADING',
     unitPrice: product.unitPrice,
     tokenPrice: product.unitPrice,
@@ -347,6 +363,23 @@ function paginate(items, url) {
 
 function findProduct(id) {
   return products.find((product) => product.id === Number(id) || product.productId === Number(id))
+}
+
+function createOrderBook(product, depth) {
+  const asks = Array.from({ length: depth }, (_, index) => ({
+    price: product.unitPrice + (index + 1) * 100,
+    quantity: 20 + index * 3,
+  }))
+  const bids = Array.from({ length: depth }, (_, index) => ({
+    price: Math.max(100, product.unitPrice - (index + 1) * 100),
+    quantity: 18 + index * 2,
+  }))
+
+  return {
+    productId: product.id,
+    asks,
+    bids,
+  }
 }
 
 function decorateTradingProduct(product, index = 0) {
@@ -868,7 +901,23 @@ async function handleProducts(request, response, url) {
       categoryName: body.categoryName || categoryNameFromCode(body.category),
       summary: body.summary || '로컬 mock 등록 상품',
       description: body.description || '로컬 mock 등록 상품 상세 설명입니다.',
+      extraInfo: body.extraInfo,
       imageUrl: body.imageUrl || 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80',
+      assetTitle: body.assetTitle,
+      location: body.location,
+      completionYear: body.completionYear,
+      assetUse: body.assetUse,
+      trackTitle: body.trackTitle,
+      artworkTitle: body.artworkTitle,
+      artist: body.artist,
+      albumTitle: body.albumTitle,
+      artworkYear: body.artworkYear,
+      collection: body.collection,
+      chartSource: body.chartSource,
+      chartRank: body.chartRank,
+      chartWeek: body.chartWeek,
+      sourceName: body.sourceName,
+      license: body.license,
       status: 'FUNDING',
       unitPrice: body.unitPrice || body.tokenPrice || 10000,
       tokenPrice: body.tokenPrice || body.unitPrice || 10000,
@@ -923,7 +972,23 @@ async function handleInvestments(request, response, url) {
   const { pathname } = url
 
   if (request.method === 'GET' && (pathname === '/api/investment-products' || pathname === '/api/investments/products')) {
-    ok(response, paginate(products.filter((product) => product.open || product.status === 'RECRUITING'), url))
+    const category = url.searchParams.get('category')
+    const keyword = url.searchParams.get('keyword')?.trim().toLowerCase()
+    let filtered = products.filter((product) => product.open || product.status === 'RECRUITING')
+
+    if (category) {
+      filtered = filtered.filter((product) => (
+        product.category === category ||
+        product.categoryName === category ||
+        product.categoryKey === category
+      ))
+    }
+
+    if (keyword) {
+      filtered = filtered.filter((product) => product.name.toLowerCase().includes(keyword))
+    }
+
+    ok(response, paginate(filtered, url))
     return
   }
 
@@ -1043,6 +1108,18 @@ async function handleOrdersAndTrades(request, response, url) {
     }
 
     ok(response, paginate(filtered.map(decorateTradingProduct), url))
+    return
+  }
+
+  if (request.method === 'GET' && /^\/api\/trading\/products\/\d+\/orderbook$/.test(pathname)) {
+    const product = findProduct(pathname.split('/')[4])
+    if (!product) {
+      fail(response, 404, 'Product not found')
+      return
+    }
+
+    const depth = Math.max(1, toInt(url.searchParams.get('depth'), 10))
+    ok(response, createOrderBook(product, depth))
     return
   }
 
@@ -1212,6 +1289,12 @@ async function handleOrdersAndTrades(request, response, url) {
   ) {
     const productId = pathname.startsWith('/api/products') ? Number(pathname.split('/')[3]) : Number(pathname.split('/')[4])
     ok(response, trades.filter((trade) => trade.productId === productId).slice(0, 20))
+    return
+  }
+
+  if (request.method === 'GET' && /^\/api\/trading\/products\/\d+\/trades$/.test(pathname)) {
+    const productId = Number(pathname.split('/')[4])
+    ok(response, paginate(trades.filter((trade) => trade.productId === productId), url))
     return
   }
 }
