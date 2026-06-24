@@ -14,7 +14,7 @@
   --warning: #b26a00;
   --shadow: 0 12px 32px rgba(2, 32, 71, 0.05);
   --shadow-strong: 0 18px 40px rgba(24, 32, 37, 0.09);
-  --font: Arial, 'Noto Sans KR', system-ui, sans-serif;
+  --font: Roboto, 'Noto Sans KR', sans-serif, AppleSDGothicNeo-Regular, 'Malgun Gothic', Dotum, sans-serif;
 
   color: var(--ink);
   background: var(--page);
@@ -464,6 +464,15 @@ button {
   border: 1px solid var(--line);
   background: #ffffff;
   color: #333d4b;
+}
+
+.product-actions .ghost-button,
+.product-actions .action-button {
+  font-weight: 700;
+}
+
+.product-actions .action-button {
+  font-weight: 500;
 }
 
 .action-button {
@@ -1940,6 +1949,7 @@ button {
   border: 0;
   background: var(--blue);
   color: #ffffff;
+  font-weight: 500;
 }
 
 .detail-metrics {

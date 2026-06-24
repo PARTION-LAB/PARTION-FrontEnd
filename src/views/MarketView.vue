@@ -42,17 +42,31 @@ const orderQuantity = ref(1)
 const depositAmount = ref(100000)
 const productKeyword = ref('')
 const productSearchMessage = ref('')
+const isProductSearchActive = ref(false)
 const widgets = ref(null)
 const customerKey = createUuid()
 const tradeMessage = ref('로그인하지 않아도 호가창과 최근 체결은 확인할 수 있습니다.')
 const MARKET_DATA_REFRESH_INTERVAL_MS = 1000
+const ORDER_BOOK_VISIBLE_LEVELS = 5
 const ORDER_SETTLEMENT_REFRESH_DELAYS_MS = [250, 500, 1000, 2000, 3500]
 let marketDataRefreshTimer = null
 let isAutoRefreshingMarketData = false
 
 const tradableProducts = computed(() => {
   const products = apiProducts.value.filter((product) => !product.open || product.status === 'TRADING')
-  return products.length ? products : mockTradableProducts
+  if (products.length || isProductSearchActive.value) {
+    return products
+  }
+
+  return mockTradableProducts
+})
+
+const visibleTradingProducts = computed(() => {
+  if (isProductSearchActive.value) {
+    return tradableProducts.value
+  }
+
+  return getRepresentativeProductsByCategory(tradableProducts.value)
 })
 
 const selectedProduct = computed(() => {
@@ -62,6 +76,11 @@ const selectedProduct = computed(() => {
     mockProducts[0]
   )
 })
+
+const visibleOrderBook = computed(() => ({
+  asks: orderBook.value.asks.slice(0, ORDER_BOOK_VISIBLE_LEVELS),
+  bids: orderBook.value.bids.slice(0, ORDER_BOOK_VISIBLE_LEVELS),
+}))
 
 const marketPrice = computed(() => {
   if (!selectedProduct.value) {
@@ -366,9 +385,29 @@ function syncOrderPrice() {
   orderPrice.value = Number.isFinite(price) ? price : 0
 }
 
+function getProductCategoryKey(product) {
+  return product.categoryCode || product.categoryKey || product.category || 'OTHER'
+}
+
+function getRepresentativeProductsByCategory(products) {
+  const categories = new Set()
+
+  return products.filter((product) => {
+    const category = getProductCategoryKey(product)
+
+    if (categories.has(category)) {
+      return false
+    }
+
+    categories.add(category)
+    return true
+  })
+}
+
 async function loadTradingProducts({ keyword = '' } = {}) {
   isLoadingProducts.value = true
   productSearchMessage.value = ''
+  isProductSearchActive.value = Boolean(keyword)
 
   try {
     const page = await getTradingProducts({ keyword, page: 0, size: 20 })
@@ -380,6 +419,7 @@ async function loadTradingProducts({ keyword = '' } = {}) {
         selectedSymbol.value = page.content[0]?.symbol
       }
     } else if (keyword) {
+      apiProducts.value = []
       productSearchMessage.value = '검색 결과가 없습니다.'
     }
   } catch (error) {
@@ -398,6 +438,7 @@ async function searchTradingProducts() {
 
 async function clearProductSearch() {
   productKeyword.value = ''
+  isProductSearchActive.value = false
   await loadTradingProducts()
 }
 
@@ -874,7 +915,7 @@ onUnmounted(() => {
             <p v-if="isLoadingProducts" class="message">거래 가능 상품을 불러오는 중입니다.</p>
             <p v-else-if="productSearchMessage" class="message">{{ productSearchMessage }}</p>
             <button
-              v-for="product in tradableProducts"
+              v-for="product in visibleTradingProducts"
               :key="product.symbol"
               class="product-result"
               :class="{ 'is-selected': selectedProduct?.symbol === product.symbol }"
@@ -911,7 +952,7 @@ onUnmounted(() => {
                   현재 대기 중인 주문이 없습니다.
                 </p>
                 <div
-                  v-for="ask in orderBook.asks"
+                  v-for="ask in visibleOrderBook.asks"
                   :key="`ask-${ask.price}`"
                   class="book-row is-ask"
                 >
@@ -920,7 +961,7 @@ onUnmounted(() => {
                   <span>{{ ask.orders }}</span>
                 </div>
                 <div
-                  v-for="bid in orderBook.bids"
+                  v-for="bid in visibleOrderBook.bids"
                   :key="`bid-${bid.price}`"
                   class="book-row is-bid"
                 >
