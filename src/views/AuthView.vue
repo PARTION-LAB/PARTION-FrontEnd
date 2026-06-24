@@ -8,6 +8,7 @@ import {
   sendEmailVerificationLink,
 } from '../api/auth'
 import { useAuth } from '../composables/useAuth'
+import { normalizeAuthRedirect } from '../utils/authRedirect'
 
 const emit = defineEmits(['navigate'])
 const route = useRoute()
@@ -90,6 +91,11 @@ function setMessage(message, type = 'info') {
 function resetEmailVerification() {
   verificationSentTo.value = ''
   isEmailVerified.value = false
+}
+
+function getPostLoginTarget() {
+  const redirect = normalizeAuthRedirect(route.query.redirect)
+  return redirect ? { path: redirect } : 'products'
 }
 
 function isValidEmail(value) {
@@ -176,7 +182,7 @@ async function handleSubmit() {
       setSession(data)
       setMessage('로그인되었습니다.', 'success')
       password.value = ''
-      emit('navigate', 'products')
+      emit('navigate', getPostLoginTarget())
     } catch (error) {
       setMessage(error.message || '로그인에 실패했습니다.', 'error')
     } finally {
@@ -219,14 +225,17 @@ const OAUTH_LOGIN_OPTIONS = {
   google: {
     label: 'Google',
     stateKey: 'partionGoogleOAuthState',
+    redirectKey: 'partionGoogleOAuthRedirect',
   },
   kakao: {
     label: 'Kakao',
     stateKey: 'partionKakaoOAuthState',
+    redirectKey: 'partionKakaoOAuthRedirect',
   },
   naver: {
     label: 'Naver',
     stateKey: 'partionNaverOAuthState',
+    redirectKey: 'partionNaverOAuthRedirect',
   },
 }
 
@@ -249,6 +258,14 @@ async function handleOAuthLogin(provider) {
     }
 
     localStorage.setItem(option.stateKey, data.state)
+    const redirect = normalizeAuthRedirect(route.query.redirect)
+
+    if (redirect) {
+      localStorage.setItem(option.redirectKey, redirect)
+    } else {
+      localStorage.removeItem(option.redirectKey)
+    }
+
     window.location.assign(data.authorizationUrl)
   } catch (error) {
     setMessage(error.message || `${option.label} 로그인을 시작하지 못했습니다.`, 'error')

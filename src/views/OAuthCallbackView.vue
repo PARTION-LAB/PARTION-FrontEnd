@@ -3,19 +3,23 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { loginWithOAuthCode } from '../api/auth'
 import { useAuth } from '../composables/useAuth'
+import { normalizeAuthRedirect } from '../utils/authRedirect'
 
 const OAUTH_PROVIDERS = {
   google: {
     label: 'Google',
     stateKey: 'partionGoogleOAuthState',
+    redirectKey: 'partionGoogleOAuthRedirect',
   },
   kakao: {
     label: 'Kakao',
     stateKey: 'partionKakaoOAuthState',
+    redirectKey: 'partionKakaoOAuthRedirect',
   },
   naver: {
     label: 'Naver',
     stateKey: 'partionNaverOAuthState',
+    redirectKey: 'partionNaverOAuthRedirect',
   },
 }
 
@@ -38,6 +42,16 @@ function setFailure(nextMessage) {
   isProcessing.value = false
 }
 
+function clearOAuthStorage(providerConfig) {
+  localStorage.removeItem(providerConfig.stateKey)
+  localStorage.removeItem(providerConfig.redirectKey)
+}
+
+function getOAuthRedirectTarget(providerConfig) {
+  const redirect = normalizeAuthRedirect(localStorage.getItem(providerConfig.redirectKey))
+  return redirect ? { path: redirect } : { name: 'products' }
+}
+
 async function completeOAuthLogin() {
   const provider = getProvider()
   const providerConfig = OAUTH_PROVIDERS[provider]
@@ -56,7 +70,7 @@ async function completeOAuthLogin() {
   const storedState = localStorage.getItem(providerConfig.stateKey)
 
   if (error) {
-    localStorage.removeItem(providerConfig.stateKey)
+    clearOAuthStorage(providerConfig)
     setFailure(
       typeof errorDescription === 'string'
         ? errorDescription
@@ -71,7 +85,7 @@ async function completeOAuthLogin() {
   }
 
   if (!storedState || storedState !== state) {
-    localStorage.removeItem(providerConfig.stateKey)
+    clearOAuthStorage(providerConfig)
     setFailure(`${providerConfig.label} 로그인 요청 정보가 일치하지 않습니다.`)
     return
   }
@@ -79,12 +93,13 @@ async function completeOAuthLogin() {
   try {
     const data = await loginWithOAuthCode({ provider, code, state })
     setSession(data)
-    localStorage.removeItem(providerConfig.stateKey)
+    const redirectTarget = getOAuthRedirectTarget(providerConfig)
+    clearOAuthStorage(providerConfig)
     message.value = `${providerConfig.label} 로그인이 완료되었습니다.`
     messageType.value = 'success'
-    await router.replace({ name: 'products' })
+    await router.replace(redirectTarget)
   } catch (nextError) {
-    localStorage.removeItem(providerConfig.stateKey)
+    clearOAuthStorage(providerConfig)
     setFailure(nextError.message || `${providerConfig.label} 로그인에 실패했습니다.`)
   }
 }

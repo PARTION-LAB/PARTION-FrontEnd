@@ -5,6 +5,7 @@ import { logoutUser } from './api/auth'
 import AiChatWidget from './components/AiChatWidget.vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import { useAuth } from './composables/useAuth'
+import { normalizeAuthRedirect } from './utils/authRedirect'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,21 @@ const { clearSession, isAuthenticated, user } = useAuth()
 const activeView = computed(() => route.meta.navKey || 'products')
 
 function navigate(view) {
+  if (view && typeof view === 'object') {
+    router.push(view)
+    return
+  }
+
+  if (view === 'login') {
+    const redirect = normalizeAuthRedirect(route.fullPath)
+
+    router.push({
+      name: 'login',
+      query: redirect ? { redirect } : {},
+    })
+    return
+  }
+
   router.push({ name: view })
 }
 
