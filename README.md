@@ -39,4 +39,4 @@ VITE_DATADOG_RUM_APPLICATION_ID
 VITE_DATADOG_RUM_CLIENT_TOKEN
 ```
 
-The production deployment captures Datadog Session Replay for 20% of RUM sessions.
+The production deployment captures Datadog Session Replay for 100% of RUM sessions.
