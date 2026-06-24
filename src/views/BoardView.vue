@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getBoard, getBoardComments, getBoards } from '../api/boards'
 
-const categories = ['전체', '공지', '상품토론', '수익인증', '질문', '건의']
+const categories = ['전체', '공지', '상품토론', '질문', '건의']
 const apiCategoryToDisplayCategory = {
   NOTICE: '공지',
   QUESTION: '질문',
@@ -11,7 +11,6 @@ const apiCategoryToDisplayCategory = {
 }
 const router = useRouter()
 const selectedCategory = ref('전체')
-const selectedPostId = ref(1)
 const isLoadingPosts = ref(false)
 const loadMessage = ref('')
 
@@ -39,18 +38,6 @@ const posts = ref([
     comments: 9,
     pinned: false,
     likedByMe: true,
-  },
-  {
-    id: 3,
-    category: '수익인증',
-    title: '밤하늘의 파도 저작권 월 정산 들어왔습니다',
-    body: '소액으로 담아둔 음악저작권 상품인데 이번 달 정산이 예상치와 비슷하게 들어왔습니다. 거래량이 조금 더 붙으면 가격도 안정될 것 같아요.',
-    authorName: '서린',
-    createdAt: '2026-06-07T20:44:00+09:00',
-    likes: 87,
-    comments: 21,
-    pinned: false,
-    likedByMe: false,
   },
   {
     id: 4,
@@ -82,9 +69,7 @@ function createFallbackMetrics(id) {
   const numericId = Number(id) || 1
 
   return {
-    likes: 12 + (numericId * 17) % 92,
     pinned: numericId === 1,
-    likedByMe: false,
   }
 }
 
@@ -115,10 +100,8 @@ async function normalizeBoardPost(board) {
     authorName: detail.writerNickname || board.writerNickname || `회원 ${detail.memberId || board.memberId || '-'}`,
     memberId: detail.memberId || board.memberId,
     createdAt: detail.createdAt || board.createdAt || new Date().toISOString(),
-    likes: fallback.likes,
     comments: commentCount,
     pinned: fallback.pinned,
-    likedByMe: fallback.likedByMe,
   }
 }
 
@@ -128,10 +111,6 @@ const visiblePosts = computed(() => {
   }
 
   return posts.value.filter((post) => post.category === selectedCategory.value)
-})
-
-const selectedPost = computed(() => {
-  return posts.value.find((post) => post.id === selectedPostId.value) || visiblePosts.value[0]
 })
 
 function formatDate(value) {
@@ -151,12 +130,6 @@ function categoryCount(category) {
 
 function selectCategory(category) {
   selectedCategory.value = category
-  selectedPostId.value = visiblePosts.value[0]?.id || selectedPostId.value
-}
-
-function toggleLike(post) {
-  post.likedByMe = !post.likedByMe
-  post.likes += post.likedByMe ? 1 : -1
 }
 
 function goWritePage() {
@@ -164,7 +137,6 @@ function goWritePage() {
 }
 
 function goDetailPage(postId) {
-  selectedPostId.value = postId
   router.push(`/board/${postId}`)
 }
 
@@ -178,7 +150,6 @@ async function loadPosts() {
 
     if (apiPosts.length) {
       posts.value = apiPosts
-      selectedPostId.value = apiPosts[0].id
     }
   } catch (error) {
     loadMessage.value = `${error.message || '게시글 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
@@ -196,7 +167,7 @@ onMounted(loadPosts)
       <div>
         <p class="eyebrow">Community</p>
         <h1>상품 공지와 투자자 의견을 모아보는 게시판</h1>
-        <p>상품 토론, 수익 인증, 질문, 건의를 한 화면에서 확인할 수 있습니다.</p>
+        <p>상품 토론, 질문, 건의를 한 화면에서 확인할 수 있습니다.</p>
       </div>
       <button
         class="primary-link page-action-link"
@@ -250,7 +221,6 @@ onMounted(loadPosts)
             class="board-post"
             :class="{
               'is-pinned': post.pinned,
-              'is-selected': selectedPost?.id === post.id,
             }"
             @click="goDetailPage(post.id)"
           >
@@ -260,13 +230,6 @@ onMounted(loadPosts)
             <h3>{{ post.title }}</h3>
             <p>{{ post.body }}</p>
             <div class="board-post-actions">
-              <button
-                type="button"
-                :class="{ selected: post.likedByMe }"
-                @click.stop="toggleLike(post)"
-              >
-                좋아요 {{ post.likes.toLocaleString('ko-KR') }}
-              </button>
               <span>댓글 {{ post.comments }}</span>
             </div>
           </article>
