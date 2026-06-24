@@ -8,7 +8,6 @@ const router = useRouter()
 const { isAuthenticated } = useAuth()
 const displayCategoryToApiCategory = {
   상품토론: 'FREE',
-  수익인증: 'FREE',
   질문: 'QUESTION',
   건의: 'FREE',
 }
@@ -80,7 +79,7 @@ function cancelWrite() {
       <div>
         <p class="eyebrow">Write</p>
         <h1>새 게시글 작성</h1>
-        <p>상품 토론, 수익 인증, 질문, 건의를 게시판에 공유할 수 있습니다.</p>
+        <p>상품 토론, 질문, 건의를 게시판에 공유할 수 있습니다.</p>
       </div>
     </section>
 
@@ -96,7 +95,6 @@ function cancelWrite() {
             카테고리
             <select v-model="composeCategory">
               <option value="상품토론">상품토론</option>
-              <option value="수익인증">수익인증</option>
               <option value="질문">질문</option>
               <option value="건의">건의</option>
             </select>
