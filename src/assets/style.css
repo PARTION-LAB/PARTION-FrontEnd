@@ -385,7 +385,7 @@ button {
 }
 
 .recruitment-meter {
-  margin-top: 18px;
+  margin-top: calc(8px + var(--meter-offset, 0px));
   border-radius: 8px;
   padding: 20px 14px 14px;
   background: var(--surface-soft);
