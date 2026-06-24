@@ -11,7 +11,6 @@ const apiCategoryToDisplayCategory = {
 }
 const router = useRouter()
 const selectedCategory = ref('전체')
-const selectedPostId = ref(1)
 const isLoadingPosts = ref(false)
 const loadMessage = ref('')
 
@@ -114,10 +113,6 @@ const visiblePosts = computed(() => {
   return posts.value.filter((post) => post.category === selectedCategory.value)
 })
 
-const selectedPost = computed(() => {
-  return posts.value.find((post) => post.id === selectedPostId.value) || visiblePosts.value[0]
-})
-
 function formatDate(value) {
   return new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
@@ -135,7 +130,6 @@ function categoryCount(category) {
 
 function selectCategory(category) {
   selectedCategory.value = category
-  selectedPostId.value = visiblePosts.value[0]?.id || selectedPostId.value
 }
 
 function goWritePage() {
@@ -143,7 +137,6 @@ function goWritePage() {
 }
 
 function goDetailPage(postId) {
-  selectedPostId.value = postId
   router.push(`/board/${postId}`)
 }
 
@@ -157,7 +150,6 @@ async function loadPosts() {
 
     if (apiPosts.length) {
       posts.value = apiPosts
-      selectedPostId.value = apiPosts[0].id
     }
   } catch (error) {
     loadMessage.value = `${error.message || '게시글 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
