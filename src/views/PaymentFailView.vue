@@ -19,20 +19,27 @@ const returnTarget = computed(() => {
 
 <template>
   <main class="payment-result-page">
-    <section class="payment-result-panel">
-      <p class="eyebrow">Payment</p>
-      <h1>결제 실패</h1>
-      <p>{{ message }}</p>
-
-      <dl class="order-summary">
+    <section class="payment-result-panel is-error">
+      <div class="payment-result-header">
+        <span class="payment-result-icon" aria-hidden="true"></span>
         <div>
-          <dt>오류 코드</dt>
-          <dd>{{ code }}</dd>
+          <p class="eyebrow">Payment</p>
+          <h1>결제 실패</h1>
+          <p class="payment-result-message">{{ message }}</p>
         </div>
-      </dl>
+      </div>
 
-      <div class="payment-result-actions">
-        <RouterLink class="secondary-link" :to="returnTarget">결제 요청 화면으로 돌아가기</RouterLink>
+      <div class="payment-result-content">
+        <dl class="payment-result-summary">
+          <div>
+            <dt>오류 코드</dt>
+            <dd>{{ code }}</dd>
+          </div>
+        </dl>
+
+        <div class="payment-result-actions">
+          <RouterLink class="primary-link" :to="returnTarget">결제 요청 화면으로 돌아가기</RouterLink>
+        </div>
       </div>
     </section>
   </main>
