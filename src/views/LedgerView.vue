@@ -1,22 +1,30 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { getLedgerBlocks, getLedgerTransactions, verifyLedger } from '../api/ledger'
 import { formatWon } from '../utils/formatters'
 
 const refreshedAt = ref(new Date())
 const blocks = ref([])
 const ledgerEvents = ref([])
+const eventTotalElements = ref(0)
+const eventPage = ref(0)
+const hasMoreEvents = ref(false)
 const ledgerStatus = ref(null)
 const ledgerMessage = ref('')
 const isLoading = ref(false)
+const isLoadingMoreEvents = ref(false)
+const eventListRef = ref(null)
+const eventLoadTriggerRef = ref(null)
 let ledgerRefreshTimer = null
+let eventLoadObserver = null
 const LEDGER_REFRESH_INTERVAL_MS = 1000
+const LEDGER_EVENT_PAGE_SIZE = 12
 
 const recentBlocks = computed(() => blocks.value.slice(0, 8))
-const recentEvents = computed(() => ledgerEvents.value.slice(0, 12))
+const recentEvents = computed(() => ledgerEvents.value)
+const eventMetricCount = computed(() => eventTotalElements.value || ledgerEvents.value.length)
 const latestHash = computed(() => ledgerStatus.value?.latestHash || recentBlocks.value[0]?.currentHash || '')
 const isLedgerValid = computed(() => ledgerStatus.value?.valid ?? true)
-const eventCounts = computed(() => countBy(ledgerEvents.value, 'eventType'))
 const assetCounts = computed(() => countBy(ledgerEvents.value, 'productCategory'))
 const latestHeight = computed(() => ledgerStatus.value?.height ?? recentBlocks.value[0]?.blockNumber ?? 0)
 
@@ -45,6 +53,36 @@ function formatDate(value) {
   }).format(date)
 }
 
+function eventKey(event) {
+  return event.transactionHash || event.id || `${event.eventType}-${event.referenceId}`
+}
+
+function mergeEvents(currentEvents, nextEvents) {
+  const seen = new Set(currentEvents.map(eventKey))
+  const merged = [...currentEvents]
+
+  nextEvents.forEach((event) => {
+    const key = eventKey(event)
+
+    if (!seen.has(key)) {
+      seen.add(key)
+      merged.push(event)
+    }
+  })
+
+  return merged
+}
+
+function applyEventPage(pageData, { append = false } = {}) {
+  ledgerEvents.value = append
+    ? mergeEvents(ledgerEvents.value, pageData.content)
+    : pageData.content
+  eventPage.value = pageData.page
+  hasMoreEvents.value = pageData.hasNext
+  eventTotalElements.value = pageData.totalElements
+  scheduleEventLoadObserver()
+}
+
 async function refreshLedger({ silent = false } = {}) {
   if (isLoading.value) {
     return
@@ -56,14 +94,20 @@ async function refreshLedger({ silent = false } = {}) {
   }
 
   try {
+    const shouldRefreshEvents = eventPage.value === 0 && !isLoadingMoreEvents.value
+    const eventPageRequest = shouldRefreshEvents
+      ? getLedgerTransactions({ page: 0, size: LEDGER_EVENT_PAGE_SIZE })
+      : Promise.resolve(null)
     const [blockPage, transactionPage, verifyResult] = await Promise.all([
       getLedgerBlocks({ page: 0, size: 20 }),
-      getLedgerTransactions({ page: 0, size: 50 }),
+      eventPageRequest,
       verifyLedger(),
     ])
 
     blocks.value = blockPage.content
-    ledgerEvents.value = transactionPage.content
+    if (transactionPage) {
+      applyEventPage(transactionPage)
+    }
     ledgerStatus.value = verifyResult
     refreshedAt.value = new Date()
   } catch (error) {
@@ -71,6 +115,67 @@ async function refreshLedger({ silent = false } = {}) {
   } finally {
     isLoading.value = false
   }
+}
+
+async function loadMoreEvents() {
+  if (isLoadingMoreEvents.value || !hasMoreEvents.value) {
+    return
+  }
+
+  isLoadingMoreEvents.value = true
+
+  try {
+    const nextPage = await getLedgerTransactions({
+      page: eventPage.value + 1,
+      size: LEDGER_EVENT_PAGE_SIZE,
+    })
+
+    applyEventPage(nextPage, { append: true })
+  } catch (error) {
+    ledgerMessage.value = error.message || '추가 원장 이벤트를 불러오지 못했습니다.'
+  } finally {
+    isLoadingMoreEvents.value = false
+  }
+}
+
+function handleEventListScroll(event) {
+  const target = event.currentTarget
+  const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight
+
+  if (distanceToBottom < 90) {
+    void loadMoreEvents()
+  }
+}
+
+function setupEventLoadObserver() {
+  if (eventLoadObserver) {
+    eventLoadObserver.disconnect()
+    eventLoadObserver = null
+  }
+
+  if (!hasMoreEvents.value || !eventListRef.value || !eventLoadTriggerRef.value) {
+    return
+  }
+
+  if (!globalThis.IntersectionObserver) {
+    return
+  }
+
+  eventLoadObserver = new globalThis.IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) {
+      void loadMoreEvents()
+    }
+  }, {
+    root: eventListRef.value,
+    rootMargin: '90px 0px',
+    threshold: 0.01,
+  })
+
+  eventLoadObserver.observe(eventLoadTriggerRef.value)
+}
+
+function scheduleEventLoadObserver() {
+  void nextTick(setupEventLoadObserver)
 }
 
 function startLedgerAutoRefresh() {
@@ -92,12 +197,24 @@ function stopLedgerAutoRefresh() {
   ledgerRefreshTimer = null
 }
 
+function stopEventLoadObserver() {
+  if (!eventLoadObserver) {
+    return
+  }
+
+  eventLoadObserver.disconnect()
+  eventLoadObserver = null
+}
+
 onMounted(async () => {
   await refreshLedger()
   startLedgerAutoRefresh()
 })
 
-onUnmounted(stopLedgerAutoRefresh)
+onUnmounted(() => {
+  stopLedgerAutoRefresh()
+  stopEventLoadObserver()
+})
 </script>
 
 <template>
@@ -122,7 +239,7 @@ onUnmounted(stopLedgerAutoRefresh)
         </article>
         <article class="chain-metric">
           <span>Events</span>
-          <strong>{{ ledgerEvents.length.toLocaleString('ko-KR') }}</strong>
+          <strong>{{ eventMetricCount.toLocaleString('ko-KR') }}</strong>
           <small>토큰화·결제·거래 이벤트</small>
         </article>
         <article class="chain-metric">
@@ -185,7 +302,11 @@ onUnmounted(stopLedgerAutoRefresh)
               <h2>최근 이벤트</h2>
             </div>
           </div>
-          <div class="chain-list">
+          <div
+            ref="eventListRef"
+            class="chain-list ledger-event-list"
+            @scroll="handleEventListScroll"
+          >
             <div
               v-for="event in recentEvents"
               :key="event.transactionHash || event.id"
@@ -203,6 +324,15 @@ onUnmounted(stopLedgerAutoRefresh)
               <span>NO_EVENTS</span>
               <strong>체결 원장 이벤트가 아직 없습니다.</strong>
               <small>매칭엔진에서 체결이 발생하면 이곳에 기록됩니다.</small>
+            </div>
+            <div
+              v-if="hasMoreEvents"
+              ref="eventLoadTriggerRef"
+              class="ledger-event-sentinel"
+              aria-hidden="true"
+            ></div>
+            <div v-if="isLoadingMoreEvents" class="ledger-event-status" role="status">
+              이벤트를 불러오는 중입니다.
             </div>
           </div>
         </section>
@@ -222,19 +352,6 @@ onUnmounted(stopLedgerAutoRefresh)
             </div>
           </section>
 
-          <section class="chain-panel">
-            <h2>이벤트 타입</h2>
-            <div class="chain-list">
-              <div
-                v-for="([name, count]) in Object.entries(eventCounts)"
-                :key="name"
-                class="chain-row compact"
-              >
-                <span>{{ name }}</span>
-                <strong>{{ count.toLocaleString('ko-KR') }} events</strong>
-              </div>
-            </div>
-          </section>
         </aside>
       </div>
     </section>
