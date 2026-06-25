@@ -1675,7 +1675,25 @@ button {
 .product-search-results {
   display: grid;
   gap: 10px;
+  max-height: 252px;
   margin-bottom: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.product-search-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.product-search-results::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #edf0f2;
+}
+
+.product-search-results::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c7d2fe;
 }
 
 .product-result {

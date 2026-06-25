@@ -62,13 +62,7 @@ const tradableProducts = computed(() => {
   return mockTradableProducts
 })
 
-const visibleTradingProducts = computed(() => {
-  if (isProductSearchActive.value) {
-    return tradableProducts.value
-  }
-
-  return getRepresentativeProductsByCategory(tradableProducts.value)
-})
+const visibleTradingProducts = computed(() => tradableProducts.value)
 
 const selectedProduct = computed(() => {
   return (
@@ -390,32 +384,13 @@ function syncOrderPrice() {
   orderPrice.value = Number.isFinite(price) ? price : 0
 }
 
-function getProductCategoryKey(product) {
-  return product.categoryCode || product.categoryKey || product.category || 'OTHER'
-}
-
-function getRepresentativeProductsByCategory(products) {
-  const categories = new Set()
-
-  return products.filter((product) => {
-    const category = getProductCategoryKey(product)
-
-    if (categories.has(category)) {
-      return false
-    }
-
-    categories.add(category)
-    return true
-  })
-}
-
 async function loadTradingProducts({ keyword = '' } = {}) {
   isLoadingProducts.value = true
   productSearchMessage.value = ''
   isProductSearchActive.value = Boolean(keyword)
 
   try {
-    const page = await getTradingProducts({ keyword, page: 0, size: 20 })
+    const page = await getTradingProducts({ keyword, page: 0, size: 100 })
 
     if (page.content.length) {
       apiProducts.value = page.content
@@ -914,9 +889,6 @@ onUnmounted(() => {
                 초기화
               </button>
             </form>
-            <button type="button" :disabled="isLoadingProducts || isLoadingAccount" @click="refreshMarket">
-              새로고침
-            </button>
           </div>
 
           <div class="product-search-results" aria-label="거래 가능 상품 검색 결과">
