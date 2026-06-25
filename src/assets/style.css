@@ -2588,6 +2588,61 @@ button {
   gap: 10px;
 }
 
+.ledger-event-list {
+  max-height: 430px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.ledger-event-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ledger-event-list::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #edf0f2;
+}
+
+.ledger-event-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c7d2fe;
+}
+
+.ledger-event-sentinel {
+  min-height: 1px;
+}
+
+.ledger-event-status {
+  border-radius: 8px;
+  padding: 12px;
+  background: #edf2ff;
+  color: #364fc7;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.ledger-side {
+  align-content: start;
+  gap: 12px;
+}
+
+.ledger-side .chain-panel {
+  padding: 16px;
+}
+
+.ledger-side .chain-panel h2 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.ledger-side .chain-list {
+  gap: 8px;
+}
+
 .chain-row {
   display: grid;
   gap: 6px;
@@ -2599,6 +2654,20 @@ button {
 
 .chain-row.compact {
   min-height: 60px;
+}
+
+.ledger-side .chain-row.compact {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.ledger-side .chain-row.compact strong {
+  flex: 0 0 auto;
+  font-size: 13px;
 }
 
 .event-row {
