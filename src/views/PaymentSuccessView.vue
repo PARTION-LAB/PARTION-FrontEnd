@@ -17,6 +17,17 @@ const paymentKey = computed(() => String(route.query.paymentKey || ''))
 const orderId = computed(() => String(route.query.orderId || ''))
 const amount = computed(() => Number(route.query.amount || 0))
 const returnTarget = computed(() => returnPath.value)
+const resultTitle = computed(() => {
+  if (status.value === 'success') {
+    return '결제 완료'
+  }
+
+  if (status.value === 'error') {
+    return '결제 확인 실패'
+  }
+
+  return '결제 확인 중'
+})
 
 function getInvestmentSuccessMessage(result) {
   const investedQuantity = Number(result?.investedQuantity ?? result?.quantity ?? 0)
@@ -67,6 +78,12 @@ onMounted(async () => {
   const pendingInvestment = getPendingInvestment()
   returnPath.value = getPaymentReturnPath(pendingInvestment)
 
+  if (import.meta.env.DEV && route.query.preview === 'success') {
+    status.value = 'success'
+    message.value = '예치금 충전이 완료되었습니다.'
+    return
+  }
+
   try {
     await confirmDepositPayment({
       paymentKey: paymentKey.value,
@@ -102,31 +119,45 @@ onMounted(async () => {
 
 <template>
   <main class="payment-result-page">
-    <section class="payment-result-panel">
-      <p class="eyebrow">Payment</p>
-      <h1>{{ status === 'success' ? '결제 완료' : '결제 확인 중' }}</h1>
-      <p>{{ message }}</p>
-
-      <dl class="order-summary">
+    <section
+      class="payment-result-panel"
+      :class="{
+        'is-success': status === 'success',
+        'is-error': status === 'error',
+        'is-pending': status === 'pending',
+      }"
+    >
+      <div class="payment-result-header">
+        <span class="payment-result-icon" aria-hidden="true"></span>
         <div>
-          <dt>주문 번호</dt>
-          <dd>{{ orderId || '-' }}</dd>
+          <p class="eyebrow">Payment</p>
+          <h1>{{ resultTitle }}</h1>
+          <p class="payment-result-message">{{ message }}</p>
         </div>
-        <div>
-          <dt>결제 금액</dt>
-          <dd>
-            <strong>{{ formatWon(amount) }}</strong>
-          </dd>
-        </div>
-        <div v-if="investment">
-          <dt>투자 수량</dt>
-          <dd>{{ investment.quantity }}토큰</dd>
-        </div>
-      </dl>
+      </div>
 
-      <div class="payment-result-actions">
-        <RouterLink class="primary-link" :to="returnTarget">결제 요청 화면으로 돌아가기</RouterLink>
-        <RouterLink class="secondary-link" :to="{ name: 'profile' }">내 투자 내역 보기</RouterLink>
+      <div class="payment-result-content">
+        <dl class="payment-result-summary">
+          <div>
+            <dt>주문 번호</dt>
+            <dd>{{ orderId || '-' }}</dd>
+          </div>
+          <div class="is-highlight">
+            <dt>결제 금액</dt>
+            <dd>
+              <strong>{{ formatWon(amount) }}</strong>
+            </dd>
+          </div>
+          <div v-if="investment">
+            <dt>투자 수량</dt>
+            <dd>{{ investment.quantity }}토큰</dd>
+          </div>
+        </dl>
+
+        <div class="payment-result-actions">
+          <RouterLink class="primary-link" :to="returnTarget">결제 요청 화면으로 돌아가기</RouterLink>
+          <RouterLink class="secondary-link" :to="{ name: 'profile' }">내 투자 내역 보기</RouterLink>
+        </div>
       </div>
     </section>
   </main>
