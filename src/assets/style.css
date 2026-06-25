@@ -565,7 +565,8 @@ button {
 .auth-tabs button,
 .auth-form input,
 .social-login button,
-.register-form input {
+.register-form input,
+.field-select-toggle {
   min-height: 46px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -600,7 +601,10 @@ button {
 }
 
 .auth-form input,
-.register-form input {
+.register-form input,
+.field-select-toggle {
+  width: 100%;
+  min-width: 0;
   padding: 0 13px;
   color: var(--ink);
 }
@@ -1186,7 +1190,30 @@ button {
   overflow: hidden;
 }
 
-.payment-panel > button {
+.payment-action-area {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  border-top: 1px solid #edf0f2;
+  padding-top: 18px;
+}
+
+.payment-action-area .toss-widget-box {
+  margin: 0;
+}
+
+.payment-action-area .payment-status-message {
+  margin: 0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.investment-action-button {
   width: 100%;
   min-height: 46px;
   border: 0;
@@ -1196,7 +1223,7 @@ button {
   font-weight: 900;
 }
 
-.payment-panel > button:disabled {
+.investment-action-button:disabled {
   cursor: not-allowed;
   background: #9ca3af;
 }
@@ -1229,9 +1256,19 @@ button {
   line-height: 1.6;
 }
 
-.payment-result-panel .secondary-link {
+.payment-result-actions {
+  display: grid;
+  gap: 10px;
   margin-top: 24px;
+}
+
+.payment-result-panel .primary-link,
+.payment-result-panel .secondary-link {
+  display: inline-flex;
   width: 100%;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0;
 }
 
 .account,
@@ -1628,6 +1665,39 @@ button {
   margin-top: 28px;
 }
 
+.board-write-page {
+  width: min(760px, calc(100% - var(--content-gutter)));
+  padding-top: 52px;
+}
+
+.board-write-page .page-hero {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.board-write-page .page-hero h1 {
+  margin-top: 8px;
+  font-size: 38px;
+}
+
+.board-write-page .page-hero p:not(.eyebrow) {
+  margin-top: 12px;
+}
+
+.board-write-page .board-write-layout {
+  max-width: 680px;
+  margin: 22px auto 0;
+}
+
+.board-write-page .board-compose {
+  padding: 22px;
+}
+
+.board-write-page .panel-heading h2 {
+  margin-top: 6px;
+  font-size: 21px;
+}
+
 .board-detail-layout {
   display: grid;
   max-width: 720px;
@@ -1696,6 +1766,16 @@ button {
   resize: vertical;
 }
 
+.board-write-page .board-compose form {
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.board-write-page .board-compose textarea {
+  height: 220px;
+  min-height: 180px;
+}
+
 .board-compose button {
   min-height: 46px;
   border: 0;
@@ -1709,6 +1789,37 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.board-compose .field-select-toggle {
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.board-compose .field-select-toggle::after {
+  border-color: var(--subtle);
+}
+
+.board-compose .field-select-option {
+  border: 0;
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.board-compose .field-select-option:hover,
+.board-compose .field-select-option.selected {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.board-compose .form-actions button[type='submit'] {
+  border: 1px solid var(--blue);
+  background: var(--blue);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(0, 100, 255, 0.18);
 }
 
 .board-compose .form-actions .secondary-link {
@@ -2391,6 +2502,74 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+
+.field-select {
+  position: relative;
+  min-width: 0;
+}
+
+.field-select.is-open {
+  z-index: 12;
+}
+
+.field-select-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.field-select-toggle::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--subtle);
+  border-bottom: 2px solid var(--subtle);
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.field-select-toggle.is-empty {
+  color: #8b95a1;
+}
+
+.field-select-toggle span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(25, 31, 40, 0.14);
+}
+
+.field-select-option {
+  min-height: 42px;
+  border: 0;
+  padding: 0 13px;
+  background: #ffffff;
+  color: var(--ink);
+  font-weight: 900;
+  text-align: left;
+}
+
+.field-select-option:hover,
+.field-select-option.selected {
+  background: var(--blue-soft);
+  color: var(--blue);
 }
 
 .file-upload-control {

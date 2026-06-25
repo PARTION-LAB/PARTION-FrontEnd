@@ -10,10 +10,13 @@ const status = ref('pending')
 const message = ref('결제 승인 정보를 확인하고 있습니다.')
 const investment = ref(null)
 const pendingInvestmentStorageKey = 'partionPendingInvestmentOrder'
+const paymentReturnPathStorageKey = 'partionPaymentReturnPath'
+const returnPath = ref('/invest')
 
 const paymentKey = computed(() => String(route.query.paymentKey || ''))
 const orderId = computed(() => String(route.query.orderId || ''))
 const amount = computed(() => Number(route.query.amount || 0))
+const returnTarget = computed(() => returnPath.value)
 
 function getInvestmentSuccessMessage(result) {
   const investedQuantity = Number(result?.investedQuantity ?? result?.quantity ?? 0)
@@ -46,9 +49,25 @@ function getPendingInvestment() {
   }
 }
 
+function normalizeReturnPath(value) {
+  const path = String(value || '')
+
+  return path.startsWith('/') && !path.startsWith('//') ? path : '/invest'
+}
+
+function getPaymentReturnPath(pendingInvestment) {
+  return normalizeReturnPath(
+    route.query.returnTo ||
+      globalThis.sessionStorage.getItem(paymentReturnPathStorageKey) ||
+      pendingInvestment?.returnPath,
+  )
+}
+
 onMounted(async () => {
+  const pendingInvestment = getPendingInvestment()
+  returnPath.value = getPaymentReturnPath(pendingInvestment)
+
   try {
-    const pendingInvestment = getPendingInvestment()
     await confirmDepositPayment({
       paymentKey: paymentKey.value,
       orderId: orderId.value,
@@ -73,6 +92,7 @@ onMounted(async () => {
     message.value = investment.value
       ? getInvestmentSuccessMessage(investment.value)
       : '예치금 충전이 완료되었습니다.'
+    globalThis.sessionStorage.removeItem(paymentReturnPathStorageKey)
   } catch (error) {
     status.value = 'error'
     message.value = error.message || '결제 승인 처리에 실패했습니다.'
@@ -104,7 +124,10 @@ onMounted(async () => {
         </div>
       </dl>
 
-      <RouterLink class="secondary-link" :to="{ name: 'profile' }">내 투자 내역 보기</RouterLink>
+      <div class="payment-result-actions">
+        <RouterLink class="primary-link" :to="returnTarget">결제 요청 화면으로 돌아가기</RouterLink>
+        <RouterLink class="secondary-link" :to="{ name: 'profile' }">내 투자 내역 보기</RouterLink>
+      </div>
     </section>
   </main>
 </template>

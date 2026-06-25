@@ -30,6 +30,7 @@ const isRequestingPayment = ref(false)
 const paymentMessage = ref('')
 const customerKey = createUuid()
 const pendingInvestmentStorageKey = 'partionPendingInvestmentOrder'
+const paymentReturnPathStorageKey = 'partionPaymentReturnPath'
 
 const selectedProduct = computed(() => {
   return (
@@ -188,6 +189,10 @@ function createUuid() {
 
 function getOrderId() {
   return `order_${createUuid().replaceAll('-', '').slice(0, 24)}`
+}
+
+function getPaymentReturnPath() {
+  return `${window.location.pathname}${window.location.search}`
 }
 
 function loadTossPaymentsScript() {
@@ -394,6 +399,9 @@ async function handlePaymentClick() {
       amount: requiredDepositAmount.value,
     })
     const orderId = deposit.orderId || getOrderId()
+    const returnPath = getPaymentReturnPath()
+
+    globalThis.sessionStorage.setItem(paymentReturnPathStorageKey, returnPath)
 
     globalThis.sessionStorage.setItem(pendingInvestmentStorageKey, JSON.stringify({
       orderId,
@@ -401,6 +409,7 @@ async function handlePaymentClick() {
       productId: selectedProduct.value.productId,
       quantity: selectedPlan.value.tokens,
       orderName: orderName.value,
+      returnPath,
     }))
 
     await widgets.value.requestPayment({
@@ -408,8 +417,8 @@ async function handlePaymentClick() {
       orderName: orderName.value,
       customerName: user.value?.nickname || user.value?.name || 'PARTION 회원',
       customerEmail: user.value?.email || 'customer@example.com',
-      successUrl: `${window.location.origin}/payment/success`,
-      failUrl: `${window.location.origin}/payment/fail`,
+      successUrl: `${window.location.origin}/payment/success?returnTo=${encodeURIComponent(returnPath)}`,
+      failUrl: `${window.location.origin}/payment/fail?returnTo=${encodeURIComponent(returnPath)}`,
     })
   } catch (error) {
     paymentMessage.value = error.message || '결제를 시작하지 못했습니다.'
@@ -554,22 +563,25 @@ onMounted(async () => {
               <dd>{{ formatWon(requiredDepositAmount) }}</dd>
             </div>
           </dl>
-          <div
-            v-if="requiredDepositAmount > 0"
-            class="toss-widget-box"
-            aria-label="Toss 결제 선택 영역"
-          >
-            <div id="payment-methods"></div>
-            <div id="agreement"></div>
+          <div class="payment-action-area">
+            <div
+              v-if="requiredDepositAmount > 0"
+              class="toss-widget-box"
+              aria-label="Toss 결제 선택 영역"
+            >
+              <div id="payment-methods"></div>
+              <div id="agreement"></div>
+            </div>
+            <button
+              class="investment-action-button"
+              type="button"
+              :disabled="isPreparingPayment || isRequestingPayment || !selectedProduct.open"
+              @click="handlePaymentClick"
+            >
+              {{ investmentActionLabel }}
+            </button>
+            <p class="payment-status-message" role="status">{{ paymentStatusMessage }}</p>
           </div>
-          <button
-            type="button"
-            :disabled="isPreparingPayment || isRequestingPayment || !selectedProduct.open"
-            @click="handlePaymentClick"
-          >
-            {{ investmentActionLabel }}
-          </button>
-          <p class="message" role="status">{{ paymentStatusMessage }}</p>
         </aside>
       </section>
     </section>

@@ -46,6 +46,7 @@ const isProductSearchActive = ref(false)
 const widgets = ref(null)
 const customerKey = createUuid()
 const tradeMessage = ref('로그인하지 않아도 호가창과 최근 체결은 확인할 수 있습니다.')
+const paymentReturnPathStorageKey = 'partionPaymentReturnPath'
 const MARKET_DATA_REFRESH_INTERVAL_MS = 1000
 const ORDER_BOOK_VISIBLE_LEVELS = 5
 const ORDER_SETTLEMENT_REFRESH_DELAYS_MS = [250, 500, 1000, 2000, 3500]
@@ -266,6 +267,10 @@ function createUuid() {
 
 function getOrderId() {
   return `order_${createUuid().replaceAll('-', '').slice(0, 24)}`
+}
+
+function getPaymentReturnPath() {
+  return `${window.location.pathname}${window.location.search}`
 }
 
 function loadTossPaymentsScript() {
@@ -639,14 +644,17 @@ async function submitCashDeposit() {
 
     const deposit = await createDepositRequest({ amount })
     const orderId = deposit?.orderId || getOrderId()
+    const returnPath = getPaymentReturnPath()
+
+    globalThis.sessionStorage.setItem(paymentReturnPathStorageKey, returnPath)
 
     await widgets.value.requestPayment({
       orderId,
       orderName: depositOrderName.value,
       customerName: user.value?.nickname || user.value?.name || 'PARTION 회원',
       customerEmail: user.value?.email || 'customer@example.com',
-      successUrl: `${window.location.origin}/payment/success`,
-      failUrl: `${window.location.origin}/payment/fail`,
+      successUrl: `${window.location.origin}/payment/success?returnTo=${encodeURIComponent(returnPath)}`,
+      failUrl: `${window.location.origin}/payment/fail?returnTo=${encodeURIComponent(returnPath)}`,
     })
   } catch (error) {
     tradeMessage.value = error.message || 'Toss 결제를 시작하지 못했습니다.'

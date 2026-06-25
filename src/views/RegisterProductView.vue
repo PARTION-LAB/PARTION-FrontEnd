@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { createProduct, getMyProducts, uploadProductImage } from '../api/products'
 import { useAuth } from '../composables/useAuth'
 
@@ -14,6 +14,7 @@ const message = ref('')
 const isSubmitting = ref(false)
 const isLoadingMyProducts = ref(false)
 const myProducts = ref([])
+const openSelectField = ref('')
 
 const assetTypeOptions = [
   {
@@ -35,10 +36,9 @@ const assetTypeOptions = [
       ['대표 이미지 URL', 'https://example.com/building.jpg'],
     ],
     termFields: [
-      ['목표 투자금', '100000000'],
+      ['목표 투자금(만원)', '예: 10'],
       ['토큰 단가', '10000'],
       ['예상 연 수익률', '6.4'],
-      ['예상 수익 표시', '예: 연 6.4%'],
       ['정산 방식', '분기 배당'],
       ['리스크 등급', '중위험'],
       ['모집 마감일', 'YYYY-MM-DD'],
@@ -64,9 +64,9 @@ const assetTypeOptions = [
       ['대표 이미지 URL', 'https://example.com/artwork.jpg'],
     ],
     termFields: [
-      ['목표 투자금', '800000000'],
+      ['목표 투자금(만원)', '예: 10'],
       ['토큰 단가', '25000'],
-      ['예상 수익 표시', '예: 매각 차익형'],
+      ['예상 연 수익률', '8.0'],
       ['정산 방식', '매각 정산'],
       ['리스크 등급', '중고위험'],
       ['모집 마감일', 'YYYY-MM-DD'],
@@ -92,10 +92,9 @@ const assetTypeOptions = [
       ['대표 이미지 URL', 'https://example.com/music-cover.jpg'],
     ],
     termFields: [
-      ['목표 투자금', '500000000'],
+      ['목표 투자금(만원)', '예: 10'],
       ['토큰 단가', '5000'],
       ['예상 연 수익률', '7.5'],
-      ['예상 수익 표시', '예: 저작권료 수익률 7.5%'],
       ['정산 방식', '월 정산'],
       ['리스크 등급', '중위험'],
       ['거래 시작일', 'YYYY-MM-DD'],
@@ -122,7 +121,12 @@ const extraInfoFieldByAssetType = {
   음악저작권: '아티스트',
 }
 
+const targetAmountFieldLabel = '목표 투자금(만원)'
 const dateFieldLabels = new Set(['모집 마감일', '거래 시작일'])
+const selectFieldOptions = {
+  '정산 방식': ['월 정산', '분기 배당', '반기 배당', '연 정산', '매각 정산'],
+  '리스크 등급': ['저위험', '중위험', '중고위험', '고위험'],
+}
 
 const minSelectableDate = computed(() => {
   const tomorrow = new Date()
@@ -163,6 +167,31 @@ function isDateField(label) {
   return dateFieldLabels.has(label)
 }
 
+function isSelectField(label) {
+  return Boolean(selectFieldOptions[label])
+}
+
+function isNumericField(label) {
+  return label === targetAmountFieldLabel || label === '토큰 단가' || label === '예상 연 수익률'
+}
+
+function toggleSelectField(label) {
+  openSelectField.value = openSelectField.value === label ? '' : label
+}
+
+function selectFieldOption(label, option) {
+  updateField(label, option)
+  openSelectField.value = ''
+}
+
+function closeSelectField(event) {
+  if (event.target?.closest?.('.field-select')) {
+    return
+  }
+
+  openSelectField.value = ''
+}
+
 function toNumber(value) {
   const parsed = Number(String(value || '').replace(/,/g, ''))
   return Number.isFinite(parsed) ? parsed : 0
@@ -173,15 +202,11 @@ function getDeadline() {
 }
 
 function getExpectedYield() {
-  const numericYield = toNumber(readField('예상 연 수익률'))
+  return toNumber(readField('예상 연 수익률'))
+}
 
-  if (numericYield > 0) {
-    return numericYield
-  }
-
-  const displayValue = readField('예상 수익 표시')
-  const match = displayValue.match(/\\d+(\\.\\d+)?/)
-  return match ? Number(match[0]) : 0
+function getTargetAmount() {
+  return toNumber(readField(targetAmountFieldLabel)) * 10000
 }
 
 function validateForm() {
@@ -193,8 +218,12 @@ function validateForm() {
     return '상품명과 상품 요약을 입력해주세요.'
   }
 
-  if (toNumber(readField('목표 투자금')) <= 0 || toNumber(readField('토큰 단가')) <= 0) {
+  if (getTargetAmount() <= 0 || toNumber(readField('토큰 단가')) <= 0) {
     return '목표 투자금과 토큰 단가는 0보다 크게 입력해주세요.'
+  }
+
+  if (!readField('정산 방식') || !readField('리스크 등급')) {
+    return '정산 방식과 리스크 등급을 선택해주세요.'
   }
 
   if (!getDeadline()) {
@@ -253,7 +282,7 @@ async function submitProduct() {
       description: readField('권리 구조') || readField('상품 요약').trim(),
       imageUrl,
       extraInfo: readField(extraInfoFieldByAssetType[selectedAssetType.value]),
-      targetAmount: toNumber(readField('목표 투자금')),
+      targetAmount: getTargetAmount(),
       tokenPrice: toNumber(readField('토큰 단가')),
       expectedYield: getExpectedYield(),
       deadline: getDeadline(),
@@ -265,7 +294,7 @@ async function submitProduct() {
       imageInputRef.value.value = ''
     }
     message.value = '상품이 등록되었습니다.'
-    await loadMyProducts()
+    emit('navigate', 'products')
   } catch (error) {
     message.value = error.message || '상품을 등록하지 못했습니다.'
   } finally {
@@ -273,7 +302,14 @@ async function submitProduct() {
   }
 }
 
-onMounted(loadMyProducts)
+onMounted(() => {
+  loadMyProducts()
+  document.addEventListener('pointerdown', closeSelectField)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeSelectField)
+})
 </script>
 
 <template>
@@ -370,8 +406,45 @@ onMounted(loadMyProducts)
             <div class="form-grid">
               <label v-for="([label, placeholder]) in selectedConfig.termFields" :key="label">
                 <span>{{ label }}</span>
+                <div
+                  v-if="isSelectField(label)"
+                  class="field-select"
+                  :class="{ 'is-open': openSelectField === label }"
+                >
+                  <button
+                    type="button"
+                    class="field-select-toggle"
+                    :class="{ 'is-empty': !readField(label) }"
+                    :aria-expanded="openSelectField === label"
+                    aria-haspopup="listbox"
+                    @click="toggleSelectField(label)"
+                  >
+                    <span>{{ readField(label) || '선택해주세요' }}</span>
+                  </button>
+                  <div
+                    v-if="openSelectField === label"
+                    class="field-select-menu"
+                    role="listbox"
+                    :aria-label="label"
+                  >
+                    <button
+                      v-for="option in selectFieldOptions[label]"
+                      :key="option"
+                      type="button"
+                      class="field-select-option"
+                      :class="{ selected: readField(label) === option }"
+                      role="option"
+                      :aria-selected="readField(label) === option"
+                      @click="selectFieldOption(label, option)"
+                    >
+                      {{ option }}
+                    </button>
+                  </div>
+                </div>
                 <input
+                  v-else
                   :value="readField(label)"
+                  :inputmode="isNumericField(label) ? 'decimal' : undefined"
                   :min="isDateField(label) ? minSelectableDate : undefined"
                   :placeholder="isDateField(label) ? undefined : placeholder"
                   :type="isDateField(label) ? 'date' : 'text'"

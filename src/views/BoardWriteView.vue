@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { createBoard } from '../api/boards'
 import { useAuth } from '../composables/useAuth'
@@ -17,6 +17,8 @@ const composeTitle = ref('')
 const composeBody = ref('')
 const composeMessage = ref('')
 const isSubmitting = ref(false)
+const isCategoryOpen = ref(false)
+const categoryOptions = Object.keys(displayCategoryToApiCategory)
 const visibleMessage = computed(() => {
   if (composeMessage.value) {
     return composeMessage.value
@@ -30,6 +32,23 @@ watch(isAuthenticated, () => {
     composeMessage.value = ''
   }
 })
+
+function toggleCategoryDropdown() {
+  isCategoryOpen.value = !isCategoryOpen.value
+}
+
+function selectCategoryOption(category) {
+  composeCategory.value = category
+  isCategoryOpen.value = false
+}
+
+function closeCategoryDropdown(event) {
+  if (event.target?.closest?.('.field-select')) {
+    return
+  }
+
+  isCategoryOpen.value = false
+}
 
 function validateForm() {
   if (!isAuthenticated.value) {
@@ -71,10 +90,18 @@ async function submitPost() {
 function cancelWrite() {
   router.push('/board')
 }
+
+onMounted(() => {
+  document.addEventListener('pointerdown', closeCategoryDropdown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closeCategoryDropdown)
+})
 </script>
 
 <template>
-  <main class="board-page">
+  <main class="board-page board-write-page">
     <section class="page-hero board-hero">
       <div>
         <p class="eyebrow">Write</p>
@@ -93,11 +120,36 @@ function cancelWrite() {
         <form @submit.prevent="submitPost">
           <label>
             카테고리
-            <select v-model="composeCategory">
-              <option value="상품토론">상품토론</option>
-              <option value="질문">질문</option>
-              <option value="건의">건의</option>
-            </select>
+            <div class="field-select" :class="{ 'is-open': isCategoryOpen }">
+              <button
+                type="button"
+                class="field-select-toggle"
+                :aria-expanded="isCategoryOpen"
+                aria-haspopup="listbox"
+                @click="toggleCategoryDropdown"
+              >
+                <span>{{ composeCategory }}</span>
+              </button>
+              <div
+                v-if="isCategoryOpen"
+                class="field-select-menu"
+                role="listbox"
+                aria-label="게시글 카테고리"
+              >
+                <button
+                  v-for="category in categoryOptions"
+                  :key="category"
+                  type="button"
+                  class="field-select-option"
+                  :class="{ selected: composeCategory === category }"
+                  role="option"
+                  :aria-selected="composeCategory === category"
+                  @click="selectCategoryOption(category)"
+                >
+                  {{ category }}
+                </button>
+              </div>
+            </div>
           </label>
           <label>
             제목
