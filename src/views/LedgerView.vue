@@ -1,10 +1,14 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { getLedgerBlocks, getLedgerTransactions, verifyLedger } from '../api/ledger'
+import { getLedgerBlock, getLedgerBlocks, getLedgerTransactions, verifyLedger } from '../api/ledger'
 import { formatWon } from '../utils/formatters'
 
 const refreshedAt = ref(new Date())
 const blocks = ref([])
+const blockTotalElements = ref(0)
+const selectedBlock = ref(null)
+const blockSearchValue = ref('')
+const blockLookupMessage = ref('')
 const ledgerEvents = ref([])
 const eventTotalElements = ref(0)
 const eventPage = ref(0)
@@ -12,6 +16,7 @@ const hasMoreEvents = ref(false)
 const ledgerStatus = ref(null)
 const ledgerMessage = ref('')
 const isLoading = ref(false)
+const isLoadingBlock = ref(false)
 const isLoadingMoreEvents = ref(false)
 const eventListRef = ref(null)
 const eventLoadTriggerRef = ref(null)
@@ -22,11 +27,12 @@ const LEDGER_EVENT_PAGE_SIZE = 12
 
 const recentBlocks = computed(() => blocks.value.slice(0, 8))
 const recentEvents = computed(() => ledgerEvents.value)
+const blockMetricCount = computed(() => blockTotalElements.value || blocks.value.length)
 const eventMetricCount = computed(() => eventTotalElements.value || ledgerEvents.value.length)
 const latestHash = computed(() => ledgerStatus.value?.latestHash || recentBlocks.value[0]?.currentHash || '')
 const isLedgerValid = computed(() => ledgerStatus.value?.valid ?? true)
 const assetCounts = computed(() => countBy(ledgerEvents.value, 'productCategory'))
-const latestHeight = computed(() => ledgerStatus.value?.height ?? recentBlocks.value[0]?.blockNumber ?? 0)
+const selectedBlockEvents = computed(() => selectedBlock.value?.transactions || [])
 
 function countBy(items, key) {
   return items.reduce((counts, item) => {
@@ -83,6 +89,26 @@ function applyEventPage(pageData, { append = false } = {}) {
   scheduleEventLoadObserver()
 }
 
+function syncSelectedBlock(nextBlocks) {
+  if (!nextBlocks.length) {
+    return
+  }
+
+  if (!selectedBlock.value) {
+    selectedBlock.value = nextBlocks[0]
+    blockSearchValue.value = String(nextBlocks[0].blockNumber)
+    return
+  }
+
+  const matchingBlock = nextBlocks.find(
+    (block) => block.blockNumber === selectedBlock.value.blockNumber,
+  )
+
+  if (matchingBlock) {
+    selectedBlock.value = matchingBlock
+  }
+}
+
 async function refreshLedger({ silent = false } = {}) {
   if (isLoading.value) {
     return
@@ -105,6 +131,8 @@ async function refreshLedger({ silent = false } = {}) {
     ])
 
     blocks.value = blockPage.content
+    blockTotalElements.value = blockPage.totalElements
+    syncSelectedBlock(blockPage.content)
     if (transactionPage) {
       applyEventPage(transactionPage)
     }
@@ -115,6 +143,43 @@ async function refreshLedger({ silent = false } = {}) {
   } finally {
     isLoading.value = false
   }
+}
+
+async function loadBlock(blockNumber) {
+  const normalizedBlockNumber = Number(blockNumber)
+
+  if (!Number.isInteger(normalizedBlockNumber) || normalizedBlockNumber < 0) {
+    blockLookupMessage.value = '조회할 블록 번호를 입력해주세요.'
+    return
+  }
+
+  isLoadingBlock.value = true
+  blockLookupMessage.value = ''
+
+  try {
+    selectedBlock.value = await getLedgerBlock(normalizedBlockNumber)
+    blockSearchValue.value = String(selectedBlock.value.blockNumber)
+    blockLookupMessage.value = `#${selectedBlock.value.blockNumber} 블록을 조회했습니다.`
+  } catch (error) {
+    blockLookupMessage.value = error.status === 404
+      ? '해당 번호의 블록을 찾을 수 없습니다.'
+      : error.message || '블록 조회에 실패했습니다.'
+  } finally {
+    isLoadingBlock.value = false
+  }
+}
+
+function handleBlockSearch() {
+  void loadBlock(blockSearchValue.value)
+}
+
+function selectBlock(block) {
+  blockSearchValue.value = String(block.blockNumber)
+  void loadBlock(block.blockNumber)
+}
+
+function isSelectedBlock(block) {
+  return selectedBlock.value?.blockNumber === block.blockNumber
 }
 
 async function loadMoreEvents() {
@@ -234,7 +299,7 @@ onUnmounted(() => {
       <div class="blockchain-summary">
         <article class="chain-metric">
           <span>Blocks</span>
-          <strong>{{ blocks.length.toLocaleString('ko-KR') }}</strong>
+          <strong>{{ blockMetricCount.toLocaleString('ko-KR') }}</strong>
           <small>Genesis 포함 전체 블록</small>
         </article>
         <article class="chain-metric">
@@ -262,10 +327,40 @@ onUnmounted(() => {
             <p class="eyebrow">Latest Blocks</p>
             <h2>최근 블록 흐름</h2>
           </div>
-          <span class="ledger-pill">height {{ latestHeight.toLocaleString('ko-KR') }}</span>
         </div>
-        <div class="chain-node-map">
-          <article v-for="block in recentBlocks" :key="block.currentHash" class="chain-node">
+        <div class="ledger-block-lookup">
+          <div class="ledger-block-lookup-copy">
+            <strong>블록 번호 조회</strong>
+            <span>번호를 입력하거나 아래 최신 블록을 선택해 상세 정보를 확인할 수 있습니다.</span>
+          </div>
+          <form class="ledger-block-search" @submit.prevent="handleBlockSearch">
+            <label>
+              <span>블록 번호</span>
+              <input
+                v-model.trim="blockSearchValue"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                placeholder="예: 16"
+              />
+            </label>
+            <button type="submit" :disabled="isLoadingBlock">
+              {{ isLoadingBlock ? '조회 중' : '조회' }}
+            </button>
+          </form>
+        </div>
+        <p v-if="blockLookupMessage" class="ledger-block-message">
+          {{ blockLookupMessage }}
+        </p>
+        <div class="chain-node-map ledger-block-list">
+          <button
+            v-for="block in recentBlocks"
+            :key="block.currentHash"
+            type="button"
+            class="chain-node ledger-block-node"
+            :class="{ active: isSelectedBlock(block) }"
+            @click="selectBlock(block)"
+          >
             <span>#{{ block.blockNumber }}</span>
             <strong>{{ shortHash(block.currentHash) }}</strong>
             <dl>
@@ -286,12 +381,70 @@ onUnmounted(() => {
                 <dd>{{ block.eventCount }}</dd>
               </div>
             </dl>
-          </article>
+          </button>
           <article v-if="!recentBlocks.length" class="chain-node">
             <span>#-</span>
             <strong>아직 생성된 블록이 없습니다.</strong>
           </article>
         </div>
+
+        <aside class="ledger-block-detail">
+          <template v-if="selectedBlock">
+            <div class="ledger-block-detail-header">
+              <span class="ledger-pill">Block #{{ selectedBlock.blockNumber }}</span>
+              <strong>{{ shortHash(selectedBlock.currentHash) }}</strong>
+            </div>
+            <dl class="ledger-block-facts">
+              <div>
+                <dt>생성 시간</dt>
+                <dd>{{ formatDate(selectedBlock.createdAt) }}</dd>
+              </div>
+              <div>
+                <dt>이벤트</dt>
+                <dd>{{ selectedBlock.eventCount.toLocaleString('ko-KR') }}개</dd>
+              </div>
+              <div>
+                <dt>현재 해시</dt>
+                <dd>{{ selectedBlock.currentHash || '-' }}</dd>
+              </div>
+              <div>
+                <dt>이전 해시</dt>
+                <dd>{{ selectedBlock.previousHash || '-' }}</dd>
+              </div>
+              <div>
+                <dt>Merkle Root</dt>
+                <dd>{{ selectedBlock.merkleRoot || '-' }}</dd>
+              </div>
+            </dl>
+
+            <div class="ledger-block-events">
+              <h3>포함 이벤트</h3>
+              <div class="ledger-block-event-list">
+                <article
+                  v-for="event in selectedBlockEvents"
+                  :key="event.transactionHash || event.id"
+                  class="ledger-block-event"
+                >
+                  <span>{{ event.eventType }}</span>
+                  <strong>{{ event.productName }}</strong>
+                  <small>
+                    {{ shortHash(event.transactionHash) }} ·
+                    {{ event.quantity.toLocaleString('ko-KR') }} token ·
+                    {{ formatWon(event.amount) }}
+                  </small>
+                </article>
+                <article v-if="!selectedBlockEvents.length" class="ledger-block-event">
+                  <span>NO_EVENTS</span>
+                  <strong>이 블록에 포함된 이벤트가 없습니다.</strong>
+                </article>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <strong>조회할 블록을 선택해주세요.</strong>
+            <small>최근 블록을 누르거나 번호를 입력해 상세 정보를 확인할 수 있습니다.</small>
+          </template>
+        </aside>
       </section>
 
       <div class="ledger-layout">
