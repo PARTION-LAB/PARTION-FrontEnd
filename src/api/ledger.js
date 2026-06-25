@@ -183,6 +183,15 @@ export async function getLedgerBlocks({ page = 0, size = 20 } = {}) {
   }
 }
 
+export async function getLedgerBlock(blockNumber) {
+  const data = await handleResponse(
+    await request(`/api/ledger/blocks/${encodeURIComponent(blockNumber)}`),
+    '원장 블록을 조회하지 못했습니다.',
+  )
+
+  return normalizeLedgerBlock(data)
+}
+
 export async function getLedgerTransactions({ page = 0, size = 20 } = {}) {
   const data = await handleResponse(
     await request(appendQuery('/api/ledger/transactions', { page, size })),
