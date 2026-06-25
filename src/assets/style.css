@@ -9,7 +9,8 @@
   --line-strong: #d1d6db;
   --surface: #ffffff;
   --surface-soft: #f8fafc;
-  --page: #f5f7fa;
+  --page: #dbeafe;
+  --page-gradient: linear-gradient(to right, #dbeafe, #f3e8ff);
   --green: #20c997;
   --warning: #b26a00;
   --shadow: 0 12px 32px rgba(2, 32, 71, 0.05);
@@ -19,7 +20,9 @@
   --content-gutter: 48px;
 
   color: var(--ink);
-  background: var(--page);
+  background-color: var(--page);
+  background-image: var(--page-gradient);
+  background-attachment: fixed;
   font-family: var(--font);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -34,7 +37,9 @@
 body {
   min-width: 320px;
   margin: 0;
-  background: var(--page);
+  background-color: var(--page);
+  background-image: var(--page-gradient);
+  background-attachment: fixed;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
@@ -50,6 +55,9 @@ button {
 
 #app {
   min-height: 100svh;
+  background-color: var(--page);
+  background-image: var(--page-gradient);
+  background-attachment: fixed;
 }
 
 .topbar {
@@ -529,10 +537,9 @@ button {
   display: grid;
   place-items: center;
   padding: 56px 20px 80px;
-  background:
-    linear-gradient(130deg, rgba(0, 100, 255, 0.08), rgba(0, 100, 255, 0) 36%),
-    linear-gradient(310deg, rgba(25, 31, 40, 0.08), rgba(25, 31, 40, 0) 34%),
-    var(--page);
+  background-color: var(--page);
+  background-image: var(--page-gradient);
+  background-attachment: fixed;
 }
 
 .auth-card {
@@ -1652,7 +1659,7 @@ button {
 
 .product-search-form {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto;
   gap: 10px;
   align-items: end;
   width: min(100%, 620px);

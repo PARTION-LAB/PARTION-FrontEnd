@@ -416,12 +416,6 @@ async function searchTradingProducts() {
   await loadTradingProducts({ keyword: productKeyword.value.trim() })
 }
 
-async function clearProductSearch() {
-  productKeyword.value = ''
-  isProductSearchActive.value = false
-  await loadTradingProducts()
-}
-
 async function loadAccount() {
   if (!isAuthenticated.value) {
     wallet.value = null
@@ -884,9 +878,6 @@ onUnmounted(() => {
               </label>
               <button type="submit" :disabled="isLoadingProducts">
                 {{ isLoadingProducts ? '검색 중' : '검색' }}
-              </button>
-              <button type="button" class="secondary-action" :disabled="isLoadingProducts" @click="clearProductSearch">
-                초기화
               </button>
             </form>
           </div>
