@@ -3,8 +3,18 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+const paymentReturnPathStorageKey = 'partionPaymentReturnPath'
 const code = computed(() => route.query.code || '-')
 const message = computed(() => route.query.message || '결제가 취소되었거나 실패했습니다.')
+const returnTarget = computed(() => {
+  const path = String(
+    route.query.returnTo ||
+      globalThis.sessionStorage.getItem(paymentReturnPathStorageKey) ||
+      '/invest',
+  )
+
+  return path.startsWith('/') && !path.startsWith('//') ? path : '/invest'
+})
 </script>
 
 <template>
@@ -21,7 +31,9 @@ const message = computed(() => route.query.message || '결제가 취소되었거
         </div>
       </dl>
 
-      <RouterLink class="secondary-link" :to="{ name: 'invest' }">투자 페이지로 돌아가기</RouterLink>
+      <div class="payment-result-actions">
+        <RouterLink class="secondary-link" :to="returnTarget">결제 요청 화면으로 돌아가기</RouterLink>
+      </div>
     </section>
   </main>
 </template>
