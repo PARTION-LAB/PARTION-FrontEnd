@@ -129,7 +129,7 @@ onMounted(loadDetail)
 </script>
 
 <template>
-  <main class="board-page">
+  <main class="board-page board-detail-page">
     <section class="page-hero board-hero">
       <div>
         <p class="eyebrow">Community</p>
