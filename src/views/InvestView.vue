@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   createInvestment,
   getInvestmentProduct,
@@ -12,6 +13,7 @@ import { products as mockProducts } from '../data/products'
 import { formatHundredMillion, formatWon } from '../utils/formatters'
 
 const emit = defineEmits(['navigate'])
+const route = useRoute()
 const { isAuthenticated, user } = useAuth()
 
 const products = ref(mockProducts)
@@ -21,7 +23,7 @@ const isLoadingWallet = ref(false)
 const productMessage = ref('')
 const walletMessage = ref('')
 const investableProducts = computed(() => products.value.filter((product) => product.open))
-const selectedSymbol = ref(mockProducts.find((product) => product.open)?.symbol || mockProducts[0]?.symbol)
+const selectedSymbol = ref(getInitialSelectedSymbol())
 const selectedPlanIndex = ref(1)
 const widgets = ref(null)
 const isPaymentReady = ref(false)
@@ -31,6 +33,68 @@ const paymentMessage = ref('')
 const customerKey = createUuid()
 const pendingInvestmentStorageKey = 'partionPendingInvestmentOrder'
 const paymentReturnPathStorageKey = 'partionPaymentReturnPath'
+
+function getQueryValue(value) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function getRouteProductId() {
+  return getQueryValue(route.query.productId)
+}
+
+function getRouteProductSymbol() {
+  return getQueryValue(route.query.symbol)
+}
+
+function hasProductId(product, productId) {
+  const currentProductId = product?.productId ?? product?.id
+
+  return (
+    productId !== undefined &&
+    productId !== null &&
+    productId !== '' &&
+    currentProductId !== undefined &&
+    currentProductId !== null &&
+    String(currentProductId) === String(productId)
+  )
+}
+
+function findRouteProduct(productList) {
+  const productId = getRouteProductId()
+  const symbol = getRouteProductSymbol()
+
+  return (
+    productList.find((product) => hasProductId(product, productId)) ||
+    productList.find((product) => symbol && product.symbol === symbol)
+  )
+}
+
+function getFallbackSelectedSymbol(productList) {
+  return productList.find((product) => product.open)?.symbol || productList[0]?.symbol
+}
+
+function getInitialSelectedSymbol() {
+  return findRouteProduct(mockProducts)?.symbol || getFallbackSelectedSymbol(mockProducts)
+}
+
+function selectRouteProduct(productList) {
+  const routeProduct = findRouteProduct(productList)
+
+  if (!routeProduct) {
+    return false
+  }
+
+  selectedSymbol.value = routeProduct.symbol
+  return true
+}
+
+function selectFallbackProduct(productList) {
+  if (productList.some((product) => product.symbol === selectedSymbol.value)) {
+    return
+  }
+
+  selectedSymbol.value = getFallbackSelectedSymbol(productList)
+}
 
 const selectedProduct = computed(() => {
   return (
@@ -273,6 +337,25 @@ watch(selectedSymbol, async () => {
 
 watch(selectedPlanIndex, syncTossAmount)
 
+async function applyRouteSelection() {
+  const productId = getRouteProductId()
+
+  if (!selectRouteProduct(products.value) && productId) {
+    await loadSelectedProductDetail(productId)
+    selectRouteProduct(products.value)
+  }
+
+  selectFallbackProduct(products.value)
+}
+
+watch(
+  () => [route.query.productId, route.query.symbol],
+  async () => {
+    await applyRouteSelection()
+    await syncTossAmount()
+  },
+)
+
 async function loadInvestableProducts() {
   isLoadingProducts.value = true
   productMessage.value = ''
@@ -282,7 +365,7 @@ async function loadInvestableProducts() {
 
     if (page.content.length) {
       products.value = page.content
-      selectedSymbol.value = page.content.find((product) => product.open)?.symbol || page.content[0]?.symbol
+      await applyRouteSelection()
     }
   } catch (error) {
     productMessage.value = `${error.message || '상품 API를 불러오지 못했습니다.'} 현재는 예시 데이터로 표시합니다.`
@@ -308,7 +391,10 @@ async function loadSelectedProductDetail(productId) {
         ...products.value[index],
         ...product,
       })
+      return
     }
+
+    products.value.unshift(product)
   } catch (error) {
     productMessage.value = `${error.message || '상품 상세 API를 불러오지 못했습니다.'} 필요한 값은 예시 데이터로 보강합니다.`
   }

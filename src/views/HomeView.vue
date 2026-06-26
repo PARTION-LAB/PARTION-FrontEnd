@@ -33,6 +33,23 @@ function goProductDetail(product) {
   router.push(`/products/${product.productId || product.id}`)
 }
 
+function getProductRouteQuery(product) {
+  const productId = product.productId ?? product.id
+
+  if (productId !== undefined && productId !== null && productId !== '') {
+    return { productId: String(productId) }
+  }
+
+  return product.symbol ? { symbol: product.symbol } : {}
+}
+
+function goInvestProduct(product) {
+  emit('navigate', {
+    name: 'invest',
+    query: getProductRouteQuery(product),
+  })
+}
+
 async function loadProducts() {
   isLoadingProducts.value = true
   productMessage.value = ''
@@ -105,7 +122,7 @@ onMounted(loadProducts)
           :key="product.symbol"
           :product="product"
           @detail="goProductDetail(product)"
-          @invest="emit('navigate', 'invest')"
+          @invest="goInvestProduct(product)"
           @trade="emit('navigate', 'market')"
         />
       </div>
