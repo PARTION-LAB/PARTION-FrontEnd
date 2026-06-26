@@ -1904,7 +1904,17 @@ button {
   padding-top: 52px;
 }
 
+.board-detail-page {
+  width: min(760px, calc(100% - var(--content-gutter)));
+  padding-top: 52px;
+}
+
 .board-write-page .page-hero {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.board-detail-page .page-hero {
   max-width: 680px;
   margin: 0 auto;
 }
@@ -1914,7 +1924,16 @@ button {
   font-size: 38px;
 }
 
+.board-detail-page .page-hero h1 {
+  margin-top: 8px;
+  font-size: 38px;
+}
+
 .board-write-page .page-hero p:not(.eyebrow) {
+  margin-top: 12px;
+}
+
+.board-detail-page .page-hero p:not(.eyebrow) {
   margin-top: 12px;
 }
 
@@ -1923,11 +1942,26 @@ button {
   margin: 22px auto 0;
 }
 
+.board-detail-page .board-detail-layout {
+  max-width: 680px;
+  margin: 22px auto 0;
+}
+
 .board-write-page .board-compose {
   padding: 22px;
 }
 
+.board-detail-page .board-detail-panel,
+.board-detail-page .board-comments-panel {
+  padding: 22px;
+}
+
 .board-write-page .panel-heading h2 {
+  margin-top: 6px;
+  font-size: 21px;
+}
+
+.board-detail-page .panel-heading h2 {
   margin-top: 6px;
   font-size: 21px;
 }
