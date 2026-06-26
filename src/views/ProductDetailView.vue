@@ -137,6 +137,32 @@ async function loadProduct() {
   }
 }
 
+function getProductRouteQuery(nextProduct) {
+  const productId = nextProduct.productId ?? nextProduct.id
+
+  if (productId !== undefined && productId !== null && productId !== '') {
+    return { productId: String(productId) }
+  }
+
+  return nextProduct.symbol ? { symbol: nextProduct.symbol } : {}
+}
+
+function goProductAction() {
+  if (!product.value) {
+    return
+  }
+
+  if (product.value.open) {
+    emit('navigate', {
+      name: 'invest',
+      query: getProductRouteQuery(product.value),
+    })
+    return
+  }
+
+  emit('navigate', 'market')
+}
+
 onMounted(loadProduct)
 </script>
 
@@ -163,7 +189,7 @@ onMounted(loadProduct)
           <button
             class="primary-link"
             type="button"
-            @click="emit('navigate', product.open ? 'invest' : 'market')"
+            @click="goProductAction"
           >
             {{ product.action }}
           </button>
